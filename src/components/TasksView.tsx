@@ -1,10 +1,11 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, CheckCircle2, Circle, AlertCircle, Calendar, Sparkles, SortAsc, AlertTriangle, ArrowUpCircle, MinusCircle } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Circle, AlertCircle, Calendar, Sparkles, SortAsc, AlertTriangle, ArrowUpCircle, MinusCircle, Target, Search } from 'lucide-react';
 import { gemini, Task } from '../services/gemini';
 import { dataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+import FocusTimer from './FocusTimer';
 
 type SortType = 'newest' | 'oldest' | 'priority-high' | 'priority-low';
 
@@ -14,6 +15,8 @@ export default function TasksView() {
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
   const [sortBy, setSortBy] = useState<SortType>('priority-high');
+  const [focusTask, setFocusTask] = useState<Task | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
     if (!user) return;
@@ -67,7 +70,9 @@ export default function TasksView() {
     }
   };
 
-  const sortedTasks = [...tasks].sort((a, b) => {
+  const sortedTasks = [...tasks]
+    .filter(t => t.title.toLowerCase().includes(searchQuery.toLowerCase()))
+    .sort((a, b) => {
     if (sortBy === 'newest') return Number(b.id) - Number(a.id);
     if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
     
@@ -87,7 +92,7 @@ export default function TasksView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#050505] p-6 lg:p-10 relative overflow-hidden monochrome-grid">
+    <div className="flex-1 flex flex-col h-full bg-[#050505] p-6 lg:p-10 relative overflow-y-auto custom-scrollbar monochrome-grid">
       <div className="max-w-3xl mx-auto w-full z-10">
         {/* Input */}
         <div className="flex items-center justify-between gap-4 mb-6">
@@ -96,18 +101,31 @@ export default function TasksView() {
             <p className="text-white/30 text-[10px] uppercase tracking-[0.4em] font-black">Neural Priority Management</p>
           </header>
           
-          <div className="flex items-center gap-2">
-            <label className="text-[9px] uppercase font-black tracking-widest text-white/20 whitespace-nowrap">Sort By</label>
-            <select 
-              value={sortBy}
-              onChange={(e) => setSortBy(e.target.value as SortType)}
-              className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold text-white/60 outline-none focus:border-violet-500/50 transition-all uppercase tracking-widest appearance-none cursor-pointer"
-            >
-              <option value="priority-high">Heavy Priority</option>
-              <option value="priority-low">Light Priority</option>
-              <option value="newest">Recent Nodes</option>
-              <option value="oldest">Legacy Records</option>
-            </select>
+          <div className="flex items-center gap-4 flex-wrap md:flex-nowrap">
+            <div className="relative group/search flex-1 min-w-[200px]">
+              <Search size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-white/20 group-focus-within/search:text-violet-400 transition-colors" />
+              <input 
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search pipeline..."
+                className="w-full bg-white/5 border border-white/10 rounded-xl pl-9 pr-4 py-1.5 text-[10px] font-bold text-white outline-none focus:border-violet-500/50 transition-all uppercase tracking-widest"
+              />
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <label className="text-[9px] uppercase font-black tracking-widest text-white/20 whitespace-nowrap">Sort By</label>
+              <select 
+                value={sortBy}
+                onChange={(e) => setSortBy(e.target.value as SortType)}
+                className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold text-white/60 outline-none focus:border-violet-500/50 transition-all uppercase tracking-widest appearance-none cursor-pointer"
+              >
+                <option value="priority-high">Heavy Priority</option>
+                <option value="priority-low">Light Priority</option>
+                <option value="newest">Recent Nodes</option>
+                <option value="oldest">Legacy Records</option>
+              </select>
+            </div>
           </div>
         </div>
 
@@ -203,6 +221,14 @@ export default function TasksView() {
                 </div>
 
                 <button 
+                  onClick={() => setFocusTask(task)}
+                  className="opacity-0 group-hover:opacity-100 p-2 text-white/20 hover:text-violet-400 transition-all active:scale-90"
+                  title="Enter Focus Mode"
+                >
+                  <Target size={16} />
+                </button>
+
+                <button 
                   onClick={() => deleteTask(task.id)}
                   className="opacity-0 group-hover:opacity-100 p-2 text-white/20 hover:text-red-400 transition-all active:scale-90"
                 >
@@ -212,12 +238,14 @@ export default function TasksView() {
             ))}
           </AnimatePresence>
 
-          {tasks.length === 0 && (
+          {sortedTasks.length === 0 && (
             <div className="py-20 text-center flex flex-col items-center space-y-4">
               <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-white/10">
-                <AlertCircle size={32} strokeWidth={1} />
+                {searchQuery ? <Search size={32} strokeWidth={1} /> : <AlertCircle size={32} strokeWidth={1} />}
               </div>
-              <p className="text-white/30 text-xs uppercase tracking-widest font-bold">Pipeline Clear. No tasks found.</p>
+              <p className="text-white/30 text-xs uppercase tracking-widest font-bold">
+                {searchQuery ? `No matches found for "${searchQuery}"` : "Pipeline Clear. No tasks found."}
+              </p>
             </div>
           )}
         </div>
@@ -226,6 +254,15 @@ export default function TasksView() {
       {/* Decorative Orbs */}
       <div className="absolute top-[-20%] right-[-10%] w-[60%] h-[60%] bg-violet-600/5 blur-[120px] rounded-full pointer-events-none" />
       <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-emerald-600/5 blur-[100px] rounded-full pointer-events-none" />
+
+      <AnimatePresence>
+        {focusTask && (
+          <FocusTimer 
+            onClose={() => setFocusTask(null)} 
+            taskTitle={focusTask.title} 
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

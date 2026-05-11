@@ -34,10 +34,12 @@ interface Message {
 
 interface ChatProps {
   onMenuClick?: () => void;
+  activeConversationId: string | null;
+  setActiveConversationId: (id: string | null) => void;
 }
 
-export default function Chat({ onMenuClick }: ChatProps) {
-  const { user, logout } = useAuth();
+export default function Chat({ onMenuClick, activeConversationId, setActiveConversationId }: ChatProps) {
+  const { user } = useAuth();
   const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -55,12 +57,15 @@ export default function Chat({ onMenuClick }: ChatProps) {
   }, [copiedId]);
 
   useEffect(() => {
-    if (!user) return;
-    const unsubscribe = dataService.subscribeToMessages(user.uid, (syncedMessages) => {
+    if (!user || !activeConversationId) {
+      setMessages([]);
+      return;
+    }
+    const unsubscribe = dataService.subscribeToMessages(user.uid, activeConversationId, (syncedMessages) => {
       setMessages(syncedMessages);
     });
     return unsubscribe;
-  }, [user]);
+  }, [user, activeConversationId]);
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -88,6 +93,12 @@ export default function Chat({ onMenuClick }: ChatProps) {
     const textToProcess = forcedImagePrompt || input;
     if (!textToProcess.trim() || isLoading || !user) return;
 
+    let convId = activeConversationId;
+    if (!convId) {
+      convId = await dataService.createConversation(user.uid, textToProcess.slice(0, 30));
+      setActiveConversationId(convId);
+    }
+
     const userMessage: Message = {
       id: Date.now().toString(),
       role: 'user',
@@ -96,7 +107,7 @@ export default function Chat({ onMenuClick }: ChatProps) {
     };
 
     setInput('');
-    await dataService.addMessage(user.uid, userMessage);
+    await dataService.addMessage(user.uid, convId, userMessage);
     setIsLoading(true);
 
     try {
@@ -112,7 +123,7 @@ export default function Chat({ onMenuClick }: ChatProps) {
           quality: modelProfile?.quality
         });
         if (imageUrl) {
-          await dataService.addMessage(user.uid, {
+          await dataService.addMessage(user.uid, convId, {
             id: (Date.now() + 1).toString(),
             role: 'model',
             content: `Generated neural visualization for: "${textToProcess}"`,
@@ -128,7 +139,8 @@ export default function Chat({ onMenuClick }: ChatProps) {
         parts: [{ text: m.content }]
       }));
 
-      const systemContext = `You are ${modelProfile?.aiName || 'AkinAI'}, a sophisticated personal AI assistant created by Akin S. Sokpah from Liberia. Your tone is ${modelProfile?.style || 'Professional'}. Use markdown for formatting.`;
+      const systemContext = `You are ${modelProfile?.aiName || 'AkinAI'}, a sophisticated personal AI assistant created by Akin S. Sokpah from Liberia. Your tone is ${modelProfile?.style || 'Professional'}. Use markdown for formatting. 
+      Memory nodes: ${(modelProfile?.memory || []).join(', ')}`;
 
       // Streaming implementation
       const assistantMsgId = (Date.now() + 1).toString();
@@ -155,7 +167,7 @@ export default function Chat({ onMenuClick }: ChatProps) {
           ));
         }
 
-        await dataService.addMessage(user.uid, { ...assistantMsg, content: fullContent });
+        await dataService.addMessage(user.uid, convId, { ...assistantMsg, content: fullContent });
       } catch (streamError: any) {
         setMessages(prev => prev.map(m => 
           m.id === assistantMsgId ? { ...m, content: `⚠️ ${streamError.message || 'Stream connection failed'}` } : m
@@ -168,12 +180,14 @@ export default function Chat({ onMenuClick }: ChatProps) {
         ? "⚠️ Gemini API Key not found. Please add VITE_GEMINI_API_KEY to your env vars."
         : "⚠️ Connection error. Please check your network.";
         
-      await dataService.addMessage(user.uid, {
-        id: (Date.now() + 1).toString(),
-        role: 'model',
-        content: errorMessage,
-        timestamp: Date.now(),
-      });
+      if (convId) {
+        await dataService.addMessage(user.uid, convId, {
+          id: (Date.now() + 1).toString(),
+          role: 'model',
+          content: errorMessage,
+          timestamp: Date.now(),
+        });
+      }
     } finally {
       setIsLoading(false);
     }
@@ -221,8 +235,9 @@ export default function Chat({ onMenuClick }: ChatProps) {
   };
 
   const clearChat = async () => {
-    if (confirm('Clear all messages?') && user) {
-      await dataService.clearMessages(user.uid);
+    if (confirm('Create new chat session?') && user) {
+      setActiveConversationId(null);
+      setMessages([]);
     }
   };
 

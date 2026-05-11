@@ -154,14 +154,96 @@ export const dataService = {
     }
   },
 
-  // Messages
-  subscribeToMessages(userId: string, callback: (messages: any[]) => void) {
+  // Conversations
+  subscribeToConversations(userId: string, callback: (conversations: any[]) => void) {
     if (isNeuralMode(userId)) {
-      const messages = localStore.get(`messages_${userId}`) || [];
+      const conversations = localStore.get(`conversations_${userId}`) || [];
+      callback(conversations.sort((a: any, b: any) => b.updatedAt - a.updatedAt));
+      return () => {};
+    }
+    const path = `users/${userId}/conversations`;
+    const q = query(collection(db, path), orderBy('updatedAt', 'desc'));
+    
+    return onSnapshot(q, (snapshot) => {
+      const conversations = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+      callback(conversations);
+    }, (error) => {
+      handleFirestoreError(error, OperationType.LIST, path);
+      callback(localStore.get(`conversations_${userId}`) || []);
+    });
+  },
+
+  async createConversation(userId: string, title: string = 'New Conversation') {
+    const convId = Date.now().toString();
+    const data = {
+      id: convId,
+      title,
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    if (isNeuralMode(userId)) {
+      const conversations = localStore.get(`conversations_${userId}`) || [];
+      localStore.set(`conversations_${userId}`, [data, ...conversations]);
+      return convId;
+    }
+    const path = `users/${userId}/conversations/${convId}`;
+    try {
+      await setDoc(doc(db, path), data);
+      return convId;
+    } catch (error) {
+      handleFirestoreError(error, OperationType.CREATE, path);
+      return convId;
+    }
+  },
+
+  async updateConversation(userId: string, convId: string, data: any) {
+    const updateData = { ...data, updatedAt: Date.now() };
+    if (isNeuralMode(userId)) {
+      const conversations = localStore.get(`conversations_${userId}`) || [];
+      const index = conversations.findIndex((c: any) => c.id === convId);
+      if (index !== -1) {
+        conversations[index] = { ...conversations[index], ...updateData };
+        localStore.set(`conversations_${userId}`, conversations);
+      }
+      return;
+    }
+    const path = `users/${userId}/conversations/${convId}`;
+    try {
+      await setDoc(doc(db, path), updateData, { merge: true });
+    } catch (error) {
+      handleFirestoreError(error, OperationType.UPDATE, path);
+    }
+  },
+
+  async deleteConversation(userId: string, convId: string) {
+    if (isNeuralMode(userId)) {
+      const conversations = localStore.get(`conversations_${userId}`) || [];
+      localStore.set(`conversations_${userId}`, conversations.filter((c: any) => c.id !== convId));
+      return;
+    }
+    const path = `users/${userId}/conversations/${convId}`;
+    try {
+      // First delete messages subcollection
+      const messagesPath = `${path}/messages`;
+      const messagesSnap = await getDocs(collection(db, messagesPath));
+      await Promise.all(messagesSnap.docs.map(d => deleteDoc(doc(db, messagesPath, d.id))));
+      
+      // Then delete conversation
+      await deleteDoc(doc(db, path));
+    } catch (error) {
+      handleFirestoreError(error, OperationType.DELETE, path);
+    }
+  },
+
+  // Messages (Modified for conversations)
+  subscribeToMessages(userId: string, convId: string, callback: (messages: any[]) => void) {
+    if (!convId) return () => {};
+    if (isNeuralMode(userId)) {
+      const messages = localStore.get(`messages_${userId}_${convId}`) || [];
       callback(messages);
       return () => {};
     }
-    const path = `users/${userId}/messages`;
+    const path = `users/${userId}/conversations/${convId}/messages`;
     const q = query(collection(db, path), orderBy('timestamp', 'asc'));
     
     return onSnapshot(q, (snapshot) => {
@@ -169,23 +251,36 @@ export const dataService = {
       callback(messages);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
-      callback(localStore.get(`messages_${userId}`) || []);
+      callback(localStore.get(`messages_${userId}_${convId}`) || []);
     });
   },
 
-  async addMessage(userId: string, message: any) {
+  async addMessage(userId: string, convId: string, message: any) {
+    if (!convId) return;
     if (isNeuralMode(userId)) {
-      const messages = localStore.get(`messages_${userId}`) || [];
-      localStore.set(`messages_${userId}`, [...messages, message]);
+      const messages = localStore.get(`messages_${userId}_${convId}`) || [];
+      localStore.set(`messages_${userId}_${convId}`, [...messages, message]);
+      // Update conv timestamp
+      const conversations = localStore.get(`conversations_${userId}`) || [];
+      const index = conversations.findIndex((c: any) => c.id === convId);
+      if (index !== -1) {
+        conversations[index].updatedAt = Date.now();
+        if (conversations[index].title === 'New Conversation' && message.role === 'user') {
+          conversations[index].title = message.content.slice(0, 30) + (message.content.length > 30 ? '...' : '');
+        }
+        localStore.set(`conversations_${userId}`, conversations);
+      }
       return;
     }
-    const path = `users/${userId}/messages/${message.id}`;
+    const path = `users/${userId}/conversations/${convId}/messages/${message.id}`;
     try {
       await setDoc(doc(db, path), message);
+      // Update conv updatedAt
+      await setDoc(doc(db, `users/${userId}/conversations/${convId}`), { 
+        updatedAt: Date.now() 
+      }, { merge: true });
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
-      const messages = localStore.get(`messages_${userId}`) || [];
-      localStore.set(`messages_${userId}`, [...messages, message]);
     }
   },
   

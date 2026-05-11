@@ -52,10 +52,17 @@ service cloud.firestore {
         allow delete: if isOwner(userId);
       }
 
-      match /messages/{messageId} {
+      match /conversations/{convId} {
         allow list, get: if isOwner(userId);
-        allow create: if isOwner(userId) && isValidMessage(incoming());
+        allow create: if isOwner(userId);
+        allow update: if isOwner(userId);
         allow delete: if isOwner(userId);
+
+        match /messages/{messageId} {
+          allow list, get: if isOwner(userId);
+          allow create: if isOwner(userId) && isValidMessage(incoming());
+          allow delete: if isOwner(userId);
+        }
       }
     }
   }

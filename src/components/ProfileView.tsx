@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
-import { User, Shield, Globe, Award, MapPin, RefreshCw, LogOut, Sparkles, Cpu } from 'lucide-react';
+import { User, Shield, Globe, Award, MapPin, RefreshCw, LogOut, Sparkles, Cpu, Plus, X } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { dataService } from '../services/dataService';
 import { cn } from '../lib/utils';
@@ -14,7 +14,14 @@ export default function ProfileView() {
     style: 'Professional',
     location: 'Liberia',
     aspectRatio: '1:1',
-    quality: 'standard'
+    quality: 'standard',
+    ttsEnabled: true,
+    highContrast: false,
+    memory: [
+      "Principal: Akin S. Sokpah",
+      "Deployment: Monrovia, Liberia",
+      "Focus: High-Performance Neural Execution"
+    ]
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -32,7 +39,14 @@ export default function ProfileView() {
           style: 'Professional',
           location: 'Liberia',
           aspectRatio: '1:1',
-          quality: 'standard'
+          quality: 'standard',
+          ttsEnabled: true,
+          highContrast: false,
+          memory: [
+            "Principal: Akin S. Sokpah",
+            "Deployment: Monrovia, Liberia",
+            "Focus: High-Performance Neural Execution"
+          ]
         };
         setProfile(initial);
         await dataService.setUserProfile(user.uid, initial);
@@ -58,7 +72,7 @@ export default function ProfileView() {
   const qualities = ['standard', 'high'];
 
   return (
-    <div className="flex-1 flex flex-col h-full bg-[#050505] p-6 lg:p-10 relative overflow-hidden monochrome-grid">
+    <div className="flex-1 flex flex-col h-full bg-[#050505] p-6 lg:p-10 relative overflow-y-auto custom-scrollbar monochrome-grid">
       <div className="max-w-3xl mx-auto w-full z-10">
         <header className="mb-12 flex items-center justify-between">
           <div className="space-y-2">
@@ -187,6 +201,96 @@ export default function ProfileView() {
                   </select>
                 </div>
               </div>
+            </div>
+          </section>
+
+          <section className="glass border-white/5 p-8 rounded-[2.5rem] space-y-8 backdrop-blur-3xl md:col-span-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-violet-500/10 flex items-center justify-center text-violet-400">
+                <Cpu size={20} />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight uppercase tracking-widest">Interface Protocols</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+              <div className="flex items-center justify-between p-6 bg-white/[0.03] border border-white/10 rounded-3xl">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">Neural Audio Pipeline</h3>
+                  <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Voice Output (TTS)</p>
+                </div>
+                <button 
+                  onClick={() => saveProfile({ ...profile, ttsEnabled: !profile.ttsEnabled })}
+                  className={cn(
+                    "w-12 h-6 rounded-full transition-all relative overflow-hidden",
+                    profile.ttsEnabled ? "bg-violet-600" : "bg-white/10"
+                  )}
+                >
+                  <div className={cn(
+                    "absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-lg",
+                    profile.ttsEnabled ? "right-1" : "left-1"
+                  )} />
+                </button>
+              </div>
+
+              <div className="flex items-center justify-between p-6 bg-white/[0.03] border border-white/10 rounded-3xl">
+                <div className="space-y-1">
+                  <h3 className="text-sm font-bold text-white uppercase tracking-wider">High Contrast Mode</h3>
+                  <p className="text-[10px] text-white/30 uppercase font-black tracking-widest">Enhanced Visibility</p>
+                </div>
+                <button 
+                  onClick={() => saveProfile({ ...profile, highContrast: !profile.highContrast })}
+                  className={cn(
+                    "w-12 h-6 rounded-full transition-all relative overflow-hidden",
+                    profile.highContrast ? "bg-violet-600" : "bg-white/10"
+                  )}
+                >
+                  <div className={cn(
+                    "absolute top-1 w-4 h-4 rounded-full bg-white transition-all shadow-lg",
+                    profile.highContrast ? "right-1" : "left-1"
+                  )} />
+                </button>
+              </div>
+            </div>
+          </section>
+
+          <section className="glass border-white/5 p-8 rounded-[2.5rem] space-y-8 backdrop-blur-3xl md:col-span-2">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                <Sparkles size={20} />
+              </div>
+              <h2 className="text-lg font-bold text-white tracking-tight uppercase tracking-widest">Neural Memory Context</h2>
+            </div>
+            
+            <div className="space-y-4">
+              <div className="flex flex-wrap gap-3">
+                {(profile.memory || []).map((fact: string, i: number) => (
+                  <div key={i} className="px-4 py-2 bg-white/5 border border-white/10 rounded-xl flex items-center gap-2 group">
+                    <span className="text-[10px] text-white/60 font-bold uppercase tracking-wider">{fact}</span>
+                    <button 
+                      onClick={() => {
+                        const newMemory = (profile.memory || []).filter((_: any, idx: number) => idx !== i);
+                        saveProfile({ ...profile, memory: newMemory });
+                      }}
+                      className="opacity-0 group-hover:opacity-100 text-red-400/50 hover:text-red-400 transition-all"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                ))}
+                <button 
+                  onClick={() => {
+                    const fact = prompt('Enter a new fact for AI brain:');
+                    if (fact) saveProfile({ ...profile, memory: [...(profile.memory || []), fact] });
+                  }}
+                  className="px-4 py-2 border border-dashed border-white/20 rounded-xl text-[10px] text-white/30 hover:text-white hover:border-white/40 transition-all uppercase font-black tracking-widest flex items-center gap-2"
+                >
+                  <Plus size={12} />
+                  <span>Insert Node</span>
+                </button>
+              </div>
+              <p className="text-[9px] text-white/20 uppercase font-black tracking-[0.2em] ml-2 mt-4">
+                These nodes are used by AkinAI for personalized cognition and workflow optimization.
+              </p>
             </div>
           </section>
 

@@ -9,6 +9,7 @@ import Sidebar from './components/Sidebar';
 import TasksView from './components/TasksView';
 import ProfileView from './components/ProfileView';
 import SplashScreen from './components/SplashScreen';
+import BottomNav from './components/BottomNav';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -19,6 +20,7 @@ function AppContent() {
   const [activeView, setActiveView] = useState<View>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [showSplash, setShowSplash] = useState(true);
+  const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
   if (authLoading || showSplash) {
     return (
@@ -46,7 +48,13 @@ function AppContent() {
         return <ProfileView />;
       case 'chat':
       default:
-        return <Chat onMenuClick={() => setIsSidebarOpen(true)} />;
+        return (
+          <Chat 
+            onMenuClick={() => setIsSidebarOpen(true)} 
+            activeConversationId={activeConversationId}
+            setActiveConversationId={setActiveConversationId}
+          />
+        );
     }
   };
 
@@ -57,9 +65,11 @@ function AppContent() {
         setActiveView={setActiveView} 
         isOpen={isSidebarOpen}
         setIsOpen={setIsSidebarOpen}
+        activeConversationId={activeConversationId}
+        setActiveConversationId={setActiveConversationId}
       />
       
-      <main className="flex-1 relative overflow-hidden flex flex-col">
+      <main className="flex-1 relative overflow-hidden flex flex-col pb-16 lg:pb-0">
         <AnimatePresence mode="wait">
           <motion.div
             key={activeView}
@@ -73,6 +83,8 @@ function AppContent() {
           </motion.div>
         </AnimatePresence>
       </main>
+
+      <BottomNav activeView={activeView} setActiveView={setActiveView} />
     </div>
   );
 }

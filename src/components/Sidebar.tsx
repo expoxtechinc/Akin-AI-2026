@@ -10,9 +10,11 @@ import {
   ShieldCheck,
   Zap,
   Layout,
-  Download
+  Download,
+  X
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
+import { dataService } from '../services/dataService';
 import { cn } from '../lib/utils';
 
 type View = 'chat' | 'tasks' | 'profile';
@@ -22,12 +24,29 @@ interface SidebarProps {
   setActiveView: (view: View) => void;
   isOpen: boolean;
   setIsOpen: (isOpen: boolean) => void;
+  activeConversationId: string | null;
+  setActiveConversationId: (id: string | null) => void;
 }
 
-export default function Sidebar({ activeView, setActiveView, isOpen, setIsOpen }: SidebarProps) {
+export default function Sidebar({ 
+  activeView, 
+  setActiveView, 
+  isOpen, 
+  setIsOpen,
+  activeConversationId,
+  setActiveConversationId
+}: SidebarProps) {
   const { user } = useAuth();
   const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
   const [isInstallable, setIsInstallable] = useState(false);
+  const [conversations, setConversations] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (!user) return;
+    return dataService.subscribeToConversations(user.uid, (synced) => {
+      setConversations(synced);
+    });
+  }, [user]);
 
   useEffect(() => {
     const handler = (e: any) => {
@@ -125,6 +144,57 @@ export default function Sidebar({ activeView, setActiveView, isOpen, setIsOpen }
                 <span className="text-sm font-medium">{item.label}</span>
               </button>
             ))}
+
+            {activeView === 'chat' && (
+              <motion.div 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="pt-8 space-y-4"
+              >
+                <div className="px-2 flex items-center justify-between">
+                  <span className="text-[10px] uppercase tracking-[0.2em] opacity-40 font-bold">Recent Streams</span>
+                  <button 
+                    onClick={() => setActiveConversationId(null)}
+                    className="p-1 px-2 border border-white/5 rounded text-[8px] uppercase font-black tracking-widest text-white/30 hover:text-white transition-all"
+                  >
+                    + New
+                  </button>
+                </div>
+                
+                <div className="space-y-1 max-h-[30vh] overflow-y-auto custom-scrollbar pr-2">
+                  {conversations.map((conv) => (
+                    <button
+                      key={conv.id}
+                      onClick={() => setActiveConversationId(conv.id)}
+                      className={cn(
+                        "w-full text-left px-4 py-2.5 rounded-xl text-xs transition-all group relative truncate flex items-center justify-between",
+                        activeConversationId === conv.id 
+                          ? "bg-white/5 text-white" 
+                          : "text-white/40 hover:text-white/60 hover:bg-white/[0.01]"
+                      )}
+                    >
+                      <span className="truncate flex-1">{conv.title}</span>
+                      <X 
+                        size={12} 
+                        className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all ml-2" 
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          if (confirm('Erase this stream?')) {
+                            dataService.deleteConversation(user!.uid, conv.id);
+                            if (activeConversationId === conv.id) setActiveConversationId(null);
+                          }
+                        }}
+                      />
+                    </button>
+                  ))}
+                  {conversations.length === 0 && (
+                    <p className="px-4 py-8 text-[10px] text-white/10 uppercase tracking-widest font-black text-center italic">
+                      No active neural streams
+                    </p>
+                  )}
+                </div>
+              </motion.div>
+            )}
             
             {user && (
               <div className="pt-4 mt-4 border-t border-white/5">
