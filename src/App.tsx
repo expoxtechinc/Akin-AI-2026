@@ -8,13 +8,32 @@ import Chat from './components/Chat';
 import Sidebar from './components/Sidebar';
 import TasksView from './components/TasksView';
 import ProfileView from './components/ProfileView';
+import Login from './components/Login';
+import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AnimatePresence, motion } from 'motion/react';
 
 type View = 'chat' | 'tasks' | 'profile';
 
-export default function App() {
+function AppContent() {
+  const { user, loading } = useAuth();
   const [activeView, setActiveView] = useState<View>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+
+  if (loading) {
+    return (
+      <div className="h-screen bg-[#050505] flex items-center justify-center">
+        <motion.div 
+          animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
+          transition={{ repeat: Infinity, duration: 2 }}
+          className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full"
+        />
+      </div>
+    );
+  }
+
+  if (!user) {
+    return <Login />;
+  }
 
   const renderView = () => {
     switch (activeView) {
@@ -52,5 +71,13 @@ export default function App() {
         </AnimatePresence>
       </main>
     </div>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AppContent />
+    </AuthProvider>
   );
 }

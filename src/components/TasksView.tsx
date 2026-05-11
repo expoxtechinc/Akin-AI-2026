@@ -2,38 +2,43 @@ import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
 import { Plus, Trash2, CheckCircle2, Circle, AlertCircle, Calendar, Sparkles } from 'lucide-react';
 import { gemini, Task } from '../services/gemini';
+import { dataService } from '../services/dataService';
+import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 
 export default function TasksView() {
-  const [tasks, setTasks] = useState<Task[]>(() => {
-    const saved = localStorage.getItem('akin_tasks');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const { user } = useAuth();
+  const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
 
   useEffect(() => {
-    localStorage.setItem('akin_tasks', JSON.stringify(tasks));
-  }, [tasks]);
+    if (!user) return;
+    const unsubscribe = dataService.subscribeToTasks(user.uid, (syncedTasks) => {
+      setTasks(syncedTasks as Task[]);
+    });
+    return unsubscribe;
+  }, [user]);
 
-  const addTask = (title: string, priority: Task['priority'] = 'medium') => {
+  const addTask = async (title: string, priority: Task['priority'] = 'medium') => {
+    if (!user) return;
     const task: Task = {
       id: Date.now().toString(),
       title,
       completed: false,
       priority,
     };
-    setTasks(prev => [task, ...prev]);
+    await dataService.addTask(user.uid, task);
   };
 
-  const toggleTask = (id: string) => {
-    setTasks(prev => prev.map(t => 
-      t.id === id ? { ...t, completed: !t.completed } : t
-    ));
+  const toggleTask = async (task: Task) => {
+    if (!user) return;
+    await dataService.updateTask(user.uid, { ...task, completed: !task.completed });
   };
 
-  const deleteTask = (id: string) => {
-    setTasks(prev => prev.filter(t => t.id !== id));
+  const deleteTask = async (id: string) => {
+    if (!user) return;
+    await dataService.deleteTask(user.uid, id);
   };
 
   const handleManualAdd = (e: React.FormEvent) => {
@@ -48,9 +53,9 @@ export default function TasksView() {
     setIsExtracting(true);
     try {
       const extracted = await gemini.extractTasks(newTaskTitle);
-      extracted.forEach(t => {
-        if (t.title) addTask(t.title, t.priority || 'medium');
-      });
+      for (const t of extracted) {
+        if (t.title) await addTask(t.title, t.priority || 'medium');
+      }
       setNewTaskTitle('');
     } catch (error) {
       console.error(error);
@@ -121,7 +126,7 @@ export default function TasksView() {
                 )}
               >
                 <button 
-                  onClick={() => toggleTask(task.id)}
+                  onClick={() => toggleTask(task)}
                   className={cn(
                     "transition-colors",
                     task.completed ? "text-emerald-500" : "text-white/20 hover:text-white/60"

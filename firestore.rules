@@ -1,0 +1,62 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Default Deny
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // Public connection test path
+    match /test/connection {
+      allow read: if true;
+    }
+
+    // Helper Functions
+    function isSignedIn() { return request.auth != null; }
+    function isOwner(userId) { return isSignedIn() && request.auth.uid == userId; }
+    function isValidId(id) { return id is string && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$'); }
+    function incoming() { return request.resource.data; }
+    function existing() { return resource.data; }
+
+    function isValidUser(data) {
+      return data.keys().hasAll(['name', 'aiName']) &&
+             data.name is string && data.name.size() <= 100 &&
+             data.aiName is string && data.aiName.size() <= 100;
+    }
+
+    function isValidTask(data) {
+      return data.keys().hasAll(['id', 'title', 'completed', 'priority']) &&
+             data.id is string && data.title is string && 
+             data.completed is bool && data.priority in ['low', 'medium', 'high'] &&
+             data.title.size() <= 500;
+    }
+
+    function isValidMessage(data) {
+      return data.keys().hasAll(['id', 'role', 'content', 'timestamp']) &&
+             data.id is string && data.role in ['user', 'model'] &&
+             data.content is string && data.timestamp is number;
+    }
+
+    // Collection Rules
+    match /users/{userId} {
+      allow get: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidUser(incoming());
+      allow update: if isOwner(userId) && isValidUser(incoming()) && 
+                    incoming().diff(existing()).affectedKeys().hasOnly(['name', 'aiName', 'voice', 'style', 'location', 'updatedAt']);
+      
+      match /tasks/{taskId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidTask(incoming());
+        allow update: if isOwner(userId) && isValidTask(incoming()) && 
+                      incoming().diff(existing()).affectedKeys().hasOnly(['title', 'completed', 'priority', 'dueDate']);
+        allow delete: if isOwner(userId);
+      }
+
+      match /messages/{messageId} {
+        allow list, get: if isOwner(userId);
+        allow create: if isOwner(userId) && isValidMessage(incoming());
+        allow delete: if isOwner(userId);
+      }
+    }
+  }
+}

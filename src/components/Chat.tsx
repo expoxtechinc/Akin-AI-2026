@@ -17,6 +17,8 @@ import {
   X
 } from 'lucide-react';
 import { gemini } from '../services/gemini';
+import { dataService } from '../services/dataService';
+import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
 
 interface Message {
@@ -33,10 +35,8 @@ interface ChatProps {
 }
 
 export default function Chat({ onMenuClick }: ChatProps) {
-  const [messages, setMessages] = useState<Message[]>(() => {
-    const saved = localStorage.getItem('akin_chat_history');
-    return saved ? JSON.parse(saved) : [];
-  });
+  const { user, logout } = useAuth();
+  const [messages, setMessages] = useState<Message[]>([]);
   const [input, setInput] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [isSpeaking, setIsSpeaking] = useState(false);
@@ -45,11 +45,18 @@ export default function Chat({ onMenuClick }: ChatProps) {
   const recognitionRef = useRef<any>(null);
 
   useEffect(() => {
-    localStorage.setItem('akin_chat_history', JSON.stringify(messages));
+    if (!user) return;
+    const unsubscribe = dataService.subscribeToMessages(user.uid, (syncedMessages) => {
+      setMessages(syncedMessages);
+    });
+    return unsubscribe;
+  }, [user]);
+
+  useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
     }
-  }, [messages]);
+  }, [messages, isLoading]);
 
   useEffect(() => {
     const SpeechRecognition = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
@@ -69,7 +76,7 @@ export default function Chat({ onMenuClick }: ChatProps) {
 
   const handleSend = async (forcedImagePrompt?: string) => {
     const textToProcess = forcedImagePrompt || input;
-    if (!textToProcess.trim() || isLoading) return;
+    if (!textToProcess.trim() || isLoading || !user) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -78,8 +85,8 @@ export default function Chat({ onMenuClick }: ChatProps) {
       timestamp: Date.now(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
     setInput('');
+    await dataService.addMessage(user.uid, userMessage);
     setIsLoading(true);
 
     try {
@@ -90,13 +97,13 @@ export default function Chat({ onMenuClick }: ChatProps) {
       if (isImageRequest) {
         const imageUrl = await gemini.generateImage(textToProcess);
         if (imageUrl) {
-          setMessages(prev => [...prev, {
+          await dataService.addMessage(user.uid, {
             id: (Date.now() + 1).toString(),
             role: 'model',
             content: `I've generated this image based on your request: "${textToProcess}"`,
             imageUrl,
             timestamp: Date.now(),
-          }]);
+          });
           setIsLoading(false);
           return;
         }
@@ -115,23 +122,22 @@ export default function Chat({ onMenuClick }: ChatProps) {
       const modelMessage: Message = {
         id: (Date.now() + 1).toString(),
         role: 'model',
-        content: res || "I'm sorry, I couldn't process that.",
+        content: res || "I'm processing your request...",
         timestamp: Date.now(),
       };
 
-      setMessages(prev => [...prev, modelMessage]);
+      await dataService.addMessage(user.uid, modelMessage);
     } catch (error: any) {
       console.error(error);
-      const errorMessage = error.message === "MISSING_API_KEY" 
-        ? "⚠️ Gemini API Key not found. Please add VITE_GEMINI_API_KEY to your env vars."
-        : "⚠️ Connection error. Please check your network.";
-      
-      setMessages(prev => [...prev, {
-        id: Date.now().toString(),
+      const modelMessage: Message = {
+        id: (Date.now() + 1).toString(),
         role: 'model',
-        content: errorMessage,
-        timestamp: Date.now()
-      }]);
+        content: error.message === "MISSING_API_KEY" 
+          ? "⚠️ Gemini API Key not found. Please add VITE_GEMINI_API_KEY to your env vars."
+          : "⚠️ Connection error. Please check your network.",
+        timestamp: Date.now(),
+      };
+      await dataService.addMessage(user.uid, modelMessage);
     } finally {
       setIsLoading(false);
     }
@@ -173,10 +179,9 @@ export default function Chat({ onMenuClick }: ChatProps) {
     setMessages(prev => prev.map(m => m.id === id ? { ...m, feedback: type } : m));
   };
 
-  const clearChat = () => {
-    if (confirm('Clear all messages?')) {
-      setMessages([]);
-      localStorage.removeItem('akin_chat_history');
+  const clearChat = async () => {
+    if (confirm('Clear all messages?') && user) {
+      await dataService.clearMessages(user.uid);
     }
   };
 
@@ -206,13 +211,21 @@ export default function Chat({ onMenuClick }: ChatProps) {
             </div>
           </div>
         </div>
-        <button 
-          onClick={clearChat}
-          className="p-2.5 rounded-full hover:bg-white/5 text-white/40 hover:text-red-400 transition-all duration-300"
-          title="Clear chat history"
-        >
-          <Trash2 size={20} />
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={clearChat}
+            className="p-2.5 rounded-full hover:bg-white/5 text-white/40 hover:text-red-400 transition-all duration-300"
+            title="Clear chat history"
+          >
+            <Trash2 size={20} />
+          </button>
+          <button 
+            onClick={logout}
+            className="px-3 py-1.5 rounded-lg bg-white/5 hover:bg-white/10 text-white/40 hover:text-white text-[9px] font-bold uppercase tracking-widest transition-all border border-white/5"
+          >
+            Sign Out
+          </button>
+        </div>
       </header>
 
       {/* Messages */}
