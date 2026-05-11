@@ -54,15 +54,15 @@ export default function Sidebar({ activeView, setActiveView, isOpen, setIsOpen }
       >
         <div className="p-6 flex flex-col h-full">
           {/* Logo Section */}
-          <div className="flex items-center gap-3 mb-10 px-2">
-            <div className="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center font-bold text-white shadow-lg shadow-violet-600/20">
-              A
+          <div className="flex items-center gap-3 mb-10 px-2 lg:px-4">
+            <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center shadow-[0_4px_15px_rgba(255,255,255,0.1)] overflow-hidden">
+              <img src="https://www.image2url.com/r2/default/images/1778503153344-dedc222a-cefc-456a-b4b2-50e8b3e2226f.jpg" alt="Logo" className="w-full h-full object-cover" />
             </div>
             <div>
-              <span className="text-lg font-bold tracking-tight uppercase block">AkinAI <span className="text-[10px] opacity-40 font-normal ml-1">v2.1</span></span>
-              <div className="flex items-center gap-1">
-                <ShieldCheck size={10} className="text-emerald-500" />
-                <span className="text-[9px] uppercase tracking-widest opacity-40 font-bold">Secure Core</span>
+              <span className="text-xl font-black tracking-tighter uppercase block italic">AkinAI<span className="text-[9px] opacity-30 font-bold ml-1 not-italic">v3.0</span></span>
+              <div className="flex items-center gap-1.5">
+                <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[9px] uppercase tracking-[0.3em] opacity-40 font-black">Neural Pipeline</span>
               </div>
             </div>
           </div>

@@ -172,12 +172,9 @@ export default function ProfileView() {
                     <div className="w-full h-full rounded-full bg-[#0a0a0a] flex items-center justify-center overflow-hidden border border-white/10">
                       {/* Using a profile picture if available, or a sophisticated icon */}
                       <img 
-                        src="/akin_sokpah.jpg" 
+                        src="https://www.image2url.com/r2/default/images/1778502896002-25e72563-a347-4ad9-8c4d-d6bef658d3dd.png" 
                         alt="Akin S. Sokpah" 
                         className="w-full h-full object-cover opacity-90 group-hover:scale-105 transition-transform duration-700" 
-                        onError={(e) => {
-                          (e.target as HTMLImageElement).src = 'https://api.dicebear.com/7.x/avataaars/svg?seed=Akin';
-                        }}
                       />
                     </div>
                     <div className="absolute -bottom-2 -right-2 w-10 h-10 bg-violet-600 rounded-full flex items-center justify-center border-4 border-[#0a0a0a] shadow-lg">

@@ -8,25 +8,33 @@ import Chat from './components/Chat';
 import Sidebar from './components/Sidebar';
 import TasksView from './components/TasksView';
 import ProfileView from './components/ProfileView';
+import SplashScreen from './components/SplashScreen';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AnimatePresence, motion } from 'motion/react';
 
 type View = 'chat' | 'tasks' | 'profile';
 
 function AppContent() {
-  const { user, loading } = useAuth();
+  const { user, loading: authLoading } = useAuth();
   const [activeView, setActiveView] = useState<View>('chat');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
+  const [showSplash, setShowSplash] = useState(true);
 
-  if (loading) {
+  if (authLoading || showSplash) {
     return (
-      <div className="h-screen bg-[#020202] flex items-center justify-center">
-        <motion.div 
-          animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
-          transition={{ repeat: Infinity, duration: 2 }}
-          className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full shadow-[0_0_20px_rgba(124,58,237,0.3)]"
-        />
-      </div>
+      <AnimatePresence>
+        {showSplash ? (
+          <SplashScreen onComplete={() => setShowSplash(false)} />
+        ) : (
+          <div className="h-screen bg-[#020202] flex items-center justify-center">
+            <motion.div 
+              animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
+              transition={{ repeat: Infinity, duration: 2 }}
+              className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full shadow-[0_0_20px_rgba(124,58,237,0.3)]"
+            />
+          </div>
+        )}
+      </AnimatePresence>
     );
   }
 
