@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'motion/react';
 import { 
   MessageSquare, 
@@ -9,7 +9,8 @@ import {
   ExternalLink,
   ShieldCheck,
   Zap,
-  Layout
+  Layout,
+  Download
 } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
@@ -25,6 +26,31 @@ interface SidebarProps {
 
 export default function Sidebar({ activeView, setActiveView, isOpen, setIsOpen }: SidebarProps) {
   const { user } = useAuth();
+  const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
+  const [isInstallable, setIsInstallable] = useState(false);
+
+  useEffect(() => {
+    const handler = (e: any) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setIsInstallable(true);
+    };
+
+    window.addEventListener('beforeinstallprompt', handler);
+
+    return () => window.removeEventListener('beforeinstallprompt', handler);
+  }, []);
+
+  const handleInstall = async () => {
+    if (!deferredPrompt) return;
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setIsInstallable(false);
+      setDeferredPrompt(null);
+    }
+  };
+
   const menuItems = [
     { id: 'chat', label: 'Neural Chat', icon: MessageSquare, accent: 'violet' },
     { id: 'tasks', label: 'Task Engine', icon: CheckSquare, accent: 'emerald' },
@@ -164,6 +190,16 @@ export default function Sidebar({ activeView, setActiveView, isOpen, setIsOpen }
               <button className="w-full py-3 pill-btn text-[10px] uppercase tracking-[0.2em] font-bold mt-4 hover:bg-white/10 transition-all">
                 View Portfolio
               </button>
+              
+              {isInstallable && (
+                <button 
+                  onClick={handleInstall}
+                  className="w-full mt-2 py-4 px-4 bg-white text-black rounded-xl text-[10px] uppercase font-black tracking-[0.3em] flex items-center justify-center gap-3 hover:bg-neutral-200 transition-all shadow-[0_0_20px_rgba(255,255,255,0.1)] group"
+                >
+                  <Download size={14} className="group-hover:bounce" />
+                  <span>Install System</span>
+                </button>
+              )}
             </div>
           </div>
         </div>

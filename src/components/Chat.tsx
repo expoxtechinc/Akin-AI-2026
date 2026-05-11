@@ -142,16 +142,25 @@ export default function Chat({ onMenuClick }: ChatProps) {
       setMessages(prev => [...prev, assistantMsg]);
       let fullContent = '';
 
-      const stream = gemini.generateChatResponseStream(history, textToProcess, systemContext);
-      
-      for await (const chunk of stream) {
-        fullContent += chunk;
+      try {
+        const stream = gemini.generateChatResponseStream(history, textToProcess, systemContext);
+        
+        for await (const chunk of stream) {
+          if (chunk.startsWith('Error:')) {
+            throw new Error(chunk);
+          }
+          fullContent += chunk;
+          setMessages(prev => prev.map(m => 
+            m.id === assistantMsgId ? { ...m, content: fullContent } : m
+          ));
+        }
+
+        await dataService.addMessage(user.uid, { ...assistantMsg, content: fullContent });
+      } catch (streamError: any) {
         setMessages(prev => prev.map(m => 
-          m.id === assistantMsgId ? { ...m, content: fullContent } : m
+          m.id === assistantMsgId ? { ...m, content: `⚠️ ${streamError.message || 'Stream connection failed'}` } : m
         ));
       }
-
-      await dataService.addMessage(user.uid, { ...assistantMsg, content: fullContent });
 
     } catch (error: any) {
       console.error(error);

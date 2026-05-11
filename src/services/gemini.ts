@@ -16,8 +16,8 @@ export class GeminiService {
 
   private getClient() {
     if (this.ai) return this.ai;
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
+    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
        throw new Error("MISSING_API_KEY");
     }
     this.ai = new GoogleGenAI({ apiKey });
@@ -66,9 +66,9 @@ export class GeminiService {
           yield chunkText;
         }
       }
-    } catch (error) {
+    } catch (error: any) {
       console.error("Gemini Stream Error:", error);
-      yield "Error: Neural connection interrupted.";
+      yield `Error: ${error.message || 'Neural connection interrupted.'}`;
     }
   }
 

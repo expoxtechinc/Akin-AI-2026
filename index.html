@@ -12,6 +12,18 @@
     <meta name="theme-color" content="#020202" />
     <meta name="apple-mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <link rel="manifest" href="/manifest.json" />
+    <script>
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js').then(reg => {
+            console.log('SW registered:', reg);
+          }).catch(err => {
+            console.log('SW reg error:', err);
+          });
+        });
+      }
+    </script>
     <meta name="keywords" content="AkinAI, Akin S. Sokpah, Liberia AI Assistant, Sophisticated AI Liberia, Personal Intelligence, Neural Engine, Task Management AI, Liberia Tech, West Africa AI, Smart Assistant, Gemini Powered AI, African Coder, Software Development Liberia, Innovative AI 2026, AkinAI v2, Quantum Intelligence, Semantic Search, Real-time Pipeline, Agent Orchestrator, Enterprise AI Deployment, Vercel Optimized AI, GitHub Integration, Secure AI Tokens, README Generator AI, Automated DevOps AI, High Performance AI, Neural Compute Liberia, Digital Assistant, Productivity Tool Africa, Future of AI West Africa, Liberia Innovation, Tech Leader Liberia, Akin S. Sokpah AI, AkinAI Assistant, Intelligent Execution, Neural Chat, Task Engine AI, Identity Core AI, African Web Developer, Liberia Cloud Computing, Vercel Ready App, Next Gen AI Assistant, Monrovia Tech, Liberia Innovation Hub, Akin AI Liberia, Sokpah AI Framework, Advanced Robotics Logic, Semantic Web Assistant, Liberia Digital Transformation, AI Strategy Africa, Executive Intelligent Assistant, Customizable AI Personality, Secure Cloud Logic, Sokpah Engineering" />
     <meta name="author" content="Akin S. Sokpah" />
     
