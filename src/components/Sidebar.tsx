@@ -179,8 +179,8 @@ export default function Sidebar({
                         className="opacity-0 group-hover:opacity-40 hover:opacity-100 transition-all ml-2" 
                         onClick={(e) => {
                           e.stopPropagation();
-                          if (confirm('Erase this stream?')) {
-                            dataService.deleteConversation(user!.uid, conv.id);
+                          if (confirm('Erase this stream?') && user) {
+                            dataService.deleteConversation(user.uid, conv.id);
                             if (activeConversationId === conv.id) setActiveConversationId(null);
                           }
                         }}

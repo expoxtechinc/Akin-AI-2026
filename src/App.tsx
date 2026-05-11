@@ -22,11 +22,15 @@ function AppContent() {
   const [showSplash, setShowSplash] = useState(true);
   const [activeConversationId, setActiveConversationId] = useState<string | null>(null);
 
+  const handleSplashComplete = React.useCallback(() => {
+    setShowSplash(false);
+  }, []);
+
   if (authLoading || showSplash) {
     return (
       <AnimatePresence>
         {showSplash ? (
-          <SplashScreen onComplete={() => setShowSplash(false)} />
+          <SplashScreen onComplete={handleSplashComplete} />
         ) : (
           <div className="h-screen bg-[#020202] flex items-center justify-center">
             <motion.div 

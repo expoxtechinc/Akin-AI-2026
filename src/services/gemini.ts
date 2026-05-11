@@ -16,7 +16,13 @@ export class GeminiService {
 
   private getClient() {
     if (this.ai) return this.ai;
-    const apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    let apiKey = '';
+    try {
+      apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
+    } catch (e) {
+      apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
+    }
+    
     if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
        throw new Error("MISSING_API_KEY");
     }

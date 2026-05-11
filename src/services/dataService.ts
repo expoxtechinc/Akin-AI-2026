@@ -35,8 +35,22 @@ interface FirestoreErrorInfo {
 const isNeuralMode = (userId: string) => userId.startsWith('neural_');
 
 const localStore = {
-  get: (key: string) => JSON.parse(localStorage.getItem(`akinai_${key}`) || 'null'),
-  set: (key: string, val: any) => localStorage.setItem(`akinai_${key}`, JSON.stringify(val)),
+  get: (key: string) => {
+    try {
+      const val = localStorage.getItem(`akinai_${key}`);
+      return val ? JSON.parse(val) : null;
+    } catch (e) {
+      console.warn('LocalStore Get Error:', e);
+      return null;
+    }
+  },
+  set: (key: string, val: any) => {
+    try {
+      localStorage.setItem(`akinai_${key}`, JSON.stringify(val));
+    } catch (e) {
+      console.warn('LocalStore Set Error:', e);
+    }
+  },
 };
 
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
