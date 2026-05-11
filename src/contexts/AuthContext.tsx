@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
+import { onAuthStateChanged, signInWithPopup, googleProvider, auth, signOut } from '../services/firebase';
 
 export interface User {
   uid: string;
@@ -10,7 +11,7 @@ export interface User {
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: () => Promise<void>; // Kept for interface compatibility but points to modal trigger
+  signIn: () => Promise<void>;
   signUpCustom: (email: string, name: string) => Promise<void>;
   signInCustom: (email: string) => Promise<void>;
   logout: () => Promise<void>;
@@ -23,44 +24,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    try {
-      // Check for local session
-      let savedUser = localStorage.getItem('akinai_neural_user');
-      
-      if (!savedUser) {
-        // Auto-provision user on first visit to bypass friction
-        const defaultUser: User = {
-          uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
-          email: 'guest@neural.akin',
-          displayName: 'Neural Operator',
-          photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=AkinAI`,
-        };
-        localStorage.setItem('akinai_neural_user', JSON.stringify(defaultUser));
-        savedUser = JSON.stringify(defaultUser);
-      }
-      
-      try {
-        const parsed = JSON.parse(savedUser);
-        if (parsed && typeof parsed === 'object') {
-          setUser(parsed);
-        } else {
-          throw new Error('Invalid user format');
+    // 1. Listen for Google Auth changes
+    const unsubscribe = onAuthStateChanged(auth, (firebaseUser) => {
+      if (firebaseUser) {
+        setUser({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email,
+          displayName: firebaseUser.displayName,
+          photoURL: firebaseUser.photoURL,
+        });
+        setLoading(false);
+      } else {
+        // 2. Fallback to Local Neural Identity if no Google Session
+        try {
+          const savedUser = localStorage.getItem('akinai_neural_user');
+          if (savedUser) {
+            setUser(JSON.parse(savedUser));
+          } else {
+            // Provision guest
+            const guest: User = {
+              uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
+              email: 'guest@neural.akin',
+              displayName: 'Guest Operator',
+              photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=AkinAI`,
+            };
+            localStorage.setItem('akinai_neural_user', JSON.stringify(guest));
+            setUser(guest);
+          }
+        } catch (e) {
+          console.error('LocalStorage Auth Error:', e);
         }
-      } catch (e) {
-        // Recovery: clear corrupted storage
-        localStorage.removeItem('akinai_neural_user');
-        window.location.reload();
+        setLoading(false);
       }
-    } catch (criticalError) {
-      console.error('Critical Auth Error:', criticalError);
-    } finally {
-      setLoading(false);
-    }
+    });
+
+    return () => unsubscribe();
   }, []);
 
   const signIn = async () => {
-    // This will be handled by the UI
-    console.log('Initiating Neural Auth UI');
+    try {
+      await signInWithPopup(auth, googleProvider);
+    } catch (error) {
+      console.error('Sign In Error:', error);
+      throw error;
+    }
   };
 
   const signUpCustom = async (email: string, name: string) => {
@@ -70,37 +77,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
       displayName: name,
       photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
     };
-    
-    // Simulate neural sync latency
-    await new Promise(resolve => setTimeout(resolve, 1500));
-    
     localStorage.setItem('akinai_neural_user', JSON.stringify(newUser));
     setUser(newUser);
   };
 
   const signInCustom = async (email: string) => {
-    const savedUser = localStorage.getItem('akinai_neural_user');
-    if (savedUser) {
-      const parsed = JSON.parse(savedUser);
-      if (parsed.email === email) {
-        await new Promise(resolve => setTimeout(resolve, 1200));
-        setUser(parsed);
-        return;
-      }
-    }
-    throw new Error('Neural Signature not found in local cache');
+    const guest: User = {
+      uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
+      email,
+      displayName: email.split('@')[0],
+      photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${email}`,
+    };
+    localStorage.setItem('akinai_neural_user', JSON.stringify(guest));
+    setUser(guest);
   };
 
   const logout = async () => {
-    localStorage.removeItem('akinai_neural_user');
-    const defaultUser: User = {
-      uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
-      email: 'guest@neural.akin',
-      displayName: 'Neural Operator',
-      photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=AkinAI`,
-    };
-    localStorage.setItem('akinai_neural_user', JSON.stringify(defaultUser));
-    setUser(defaultUser);
+    try {
+      await signOut(auth);
+      localStorage.removeItem('akinai_neural_user');
+      window.location.reload();
+    } catch (error) {
+      console.error('Logout Error:', error);
+    }
   };
 
   return (

@@ -1,5 +1,3 @@
-import { GoogleGenAI, Type } from "@google/genai";
-
 const AI_MODEL = "gemini-3-flash-preview";
 const IMAGE_MODEL = "gemini-2.5-flash-image";
 
@@ -12,41 +10,18 @@ export interface Task {
 }
 
 export class GeminiService {
-  private ai: GoogleGenAI | null = null;
-
-  private getClient() {
-    if (this.ai) return this.ai;
-    let apiKey = '';
-    try {
-      apiKey = process.env.GEMINI_API_KEY || (import.meta as any).env?.VITE_GEMINI_API_KEY;
-    } catch (e) {
-      apiKey = (import.meta as any).env?.VITE_GEMINI_API_KEY || '';
-    }
-    
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
-       throw new Error("MISSING_API_KEY");
-    }
-    this.ai = new GoogleGenAI({ apiKey });
-    return this.ai;
-  }
-
   async generateChatResponse(history: { role: "user" | "model"; parts: { text: string }[] }[], prompt: string, systemContext?: string) {
     try {
-      const client = this.getClient();
-      const response = await client.models.generateContent({
-        model: AI_MODEL,
-        contents: [
-          ...history,
-          { role: "user", parts: [{ text: prompt }] }
-        ],
-        config: {
-          systemInstruction: systemContext || "You are AkinAI, a sophisticated and helpful personal AI assistant created by Akin S. Sokpah from Liberia. Your tone is professional, intelligent, and proactive. Keep responses concise but impactful. Use markdown for formatting. If the user asks to generate an image, describe what you would generate first.",
-        }
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history, prompt, systemContext, model: AI_MODEL })
       });
-
-      return response.text;
+      
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data.text;
     } catch (error: any) {
-      if (error.message === "MISSING_API_KEY") throw error;
       console.error("Gemini API Error:", error);
       throw error;
     }
@@ -54,22 +29,32 @@ export class GeminiService {
 
   async *generateChatResponseStream(history: { role: string; parts: { text: string }[] }[], prompt: string, systemContext?: string) {
     try {
-      const client = this.getClient();
-      const response = await client.models.generateContentStream({
-        model: AI_MODEL,
-        contents: [
-          ...history,
-          { role: "user", parts: [{ text: prompt }] }
-        ],
-        config: {
-          systemInstruction: systemContext || "You are AkinAI, a sophisticated personal AI assistant created by Akin S. Sokpah from Liberia.",
-        }
+      const response = await fetch('/api/ai/stream', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ history, prompt, systemContext, model: AI_MODEL })
       });
+
+      if (!response.body) throw new Error('No response body');
       
-      for await (const chunk of response) {
-        const chunkText = chunk.text;
-        if (chunkText) {
-          yield chunkText;
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      let buffer = '';
+
+      while (true) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        
+        buffer += decoder.decode(value, { stream: true });
+        const lines = buffer.split('\n\n');
+        buffer = lines.pop() || '';
+
+        for (const line of lines) {
+          if (line.startsWith('data: ')) {
+            const data = JSON.parse(line.slice(6));
+            if (data.error) throw new Error(data.error);
+            if (data.text) yield data.text;
+          }
         }
       }
     } catch (error: any) {
@@ -80,27 +65,15 @@ export class GeminiService {
 
   async generateImage(prompt: string, options: { aspectRatio?: string; quality?: string } = {}) {
     try {
-      const client = this.getClient();
-      const response = await client.models.generateContent({
-        model: IMAGE_MODEL,
-        contents: [{ parts: [{ text: prompt }] }],
-        config: {
-          imageConfig: {
-            aspectRatio: options.aspectRatio === "16:9" ? "16:9" : 
-                         options.aspectRatio === "9:16" ? "9:16" : 
-                         options.aspectRatio === "4:3" ? "4:3" : 
-                         options.aspectRatio === "3:4" ? "3:4" : "1:1",
-            quality: options.quality === "high" ? "high" : "standard"
-          } as any
-        }
+      const response = await fetch('/api/ai/image', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ prompt, options })
       });
-
-      for (const part of response.candidates?.[0]?.content?.parts || []) {
-        if (part.inlineData) {
-          return `data:image/png;base64,${part.inlineData.data}`;
-        }
-      }
-      return null;
+      
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data.imageUrl;
     } catch (error) {
       console.error("Image Gen Error:", error);
       return null;
@@ -109,26 +82,21 @@ export class GeminiService {
 
   async extractTasks(text: string): Promise<Partial<Task>[]> {
     try {
-      const client = this.getClient();
-      const response = await client.models.generateContent({
-        model: AI_MODEL,
-        contents: [{ parts: [{ text: `Extract any potential tasks or to-do items from this text: "${text}". Return as a JSON array of objects with title and optional priority (low, medium, high).` }] }],
-        config: {
-          responseMimeType: "application/json",
-          responseSchema: {
-            type: Type.ARRAY,
-            items: {
-              type: Type.OBJECT,
-              properties: {
-                title: { type: Type.STRING },
-                priority: { type: Type.STRING, enum: ['low', 'medium', 'high'] }
-              },
-              required: ['title']
-            }
-          }
-        }
+      const prompt = `Extract any potential tasks or to-do items from this text: "${text}". Return as a JSON array of objects with title and optional priority (low, medium, high).`;
+      const response = await fetch('/api/ai/chat', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ 
+          history: [], 
+          prompt, 
+          model: AI_MODEL, 
+          systemContext: "You are a task extraction engine. Output ONLY raw JSON." 
+        })
       });
-      return JSON.parse(response.text || "[]");
+      
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return JSON.parse(data.text || "[]");
     } catch (error) {
       console.error("Task Extraction Error:", error);
       return [];
@@ -137,25 +105,15 @@ export class GeminiService {
 
   async generateTTS(text: string, voice: string = "Kore") {
     try {
-      const client = this.getClient();
-      const response = await client.models.generateContent({
-        model: "gemini-3.1-flash-tts-preview",
-        contents: [{ parts: [{ text }] }],
-        config: {
-          responseModalities: ["AUDIO" as any],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice as any },
-            },
-          },
-        },
+      const response = await fetch('/api/ai/tts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ text, voice })
       });
-
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        return `data:audio/wav;base64,${base64Audio}`;
-      }
-      return null;
+      
+      const data = await response.json();
+      if (data.error) throw new Error(data.error);
+      return data.audioUrl;
     } catch (error) {
       console.error("TTS Error:", error);
       return null;

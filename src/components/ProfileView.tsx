@@ -6,7 +6,7 @@ import { dataService } from '../services/dataService';
 import { cn } from '../lib/utils';
 
 export default function ProfileView() {
-  const { user, logout } = useAuth();
+  const { user, logout, signIn } = useAuth();
   const [profile, setProfile] = useState({
     name: '',
     aiName: 'AkinAI',
@@ -202,6 +202,36 @@ export default function ProfileView() {
                 </div>
               </div>
             </div>
+          </section>
+
+          <section className="glass border-white/5 p-8 rounded-[2.5rem] space-y-8 backdrop-blur-3xl md:col-span-2">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="w-10 h-10 rounded-xl bg-orange-500/10 flex items-center justify-center text-orange-400">
+                  <RefreshCw size={20} />
+                </div>
+                <h2 className="text-lg font-bold text-white tracking-tight uppercase tracking-widest">Neural Sync</h2>
+              </div>
+              {user?.uid.startsWith('neural_') ? (
+                <button 
+                  onClick={() => signIn()}
+                  className="px-6 py-2 bg-white text-black text-[10px] uppercase font-black tracking-widest rounded-xl hover:bg-neutral-200 transition-all flex items-center gap-2"
+                >
+                  <Globe size={14} />
+                  Sync to Cloud
+                </button>
+              ) : (
+                <div className="px-4 py-1.5 bg-emerald-500/10 border border-emerald-500/20 rounded-lg flex items-center gap-2">
+                  <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                  <span className="text-[10px] text-emerald-400 uppercase font-bold tracking-widest">Cloud Active</span>
+                </div>
+              )}
+            </div>
+            <p className="text-[10px] text-white/30 uppercase font-medium tracking-widest leading-loose">
+              {user?.uid.startsWith('neural_') 
+                ? 'Your identity is currently locked to this neural node (local device). Sync to cloud to enable cross-device neural execution and persistent context.' 
+                : 'Your neural context is verified and synchronized across the cloud-mesh. Access protocols are globally persistent.'}
+            </p>
           </section>
 
           <section className="glass border-white/5 p-8 rounded-[2.5rem] space-y-8 backdrop-blur-3xl md:col-span-2">

@@ -4,7 +4,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { Sparkles, LogIn, ShieldCheck, Globe, Cpu, Zap, Fingerprint, Mail, User as UserIcon, ArrowRight, Loader2 } from 'lucide-react';
 
 export default function Login() {
-  const { signUpCustom, signInCustom } = useAuth();
+  const { signUpCustom, signInCustom, signIn } = useAuth();
   const [mode, setMode] = useState<'signin' | 'signup'>('signin');
   const [email, setEmail] = useState('');
   const [name, setName] = useState('');
@@ -128,6 +128,24 @@ export default function Login() {
                 <ArrowRight size={18} />
               </>
             )}
+          </button>
+
+          <div className="relative">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-white/5"></span>
+            </div>
+            <div className="relative flex justify-center text-[10px] uppercase font-black tracking-widest text-white/20">
+              <span className="bg-[#050505] px-4">Neural Mesh OAuth</span>
+            </div>
+          </div>
+
+          <button 
+            type="button"
+            onClick={() => signIn()}
+            className="w-full py-4 bg-white/5 border border-white/10 text-white rounded-2xl font-black uppercase text-xs tracking-[0.2em] hover:bg-white/10 transition-all active:scale-[0.98] flex items-center justify-center gap-3"
+          >
+            <Globe size={18} className="text-violet-400" />
+            <span>Link Google ID</span>
           </button>
         </form>
 
