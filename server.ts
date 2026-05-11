@@ -2,7 +2,9 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
-import { GoogleGenAI } from '@google/genai';
+import { config as dotenvConfig } from 'dotenv';
+
+dotenvConfig();
 
 async function startServer() {
   const app = express();
@@ -11,138 +13,9 @@ async function startServer() {
   app.use(cors());
   app.use(express.json());
 
-  // Gemini Proxy
-  app.post('/api/ai/chat', async (req, res) => {
-    const { history, prompt, systemContext, model } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      return res.status(500).json({ error: 'GEMINI_API_KEY_NOT_CONFIGURED' });
-    }
-
-    try {
-      const genAI = new GoogleGenAI(apiKey);
-      const activeModel = genAI.getGenerativeModel({ 
-        model: model || 'gemini-3-flash-preview',
-        systemInstruction: systemContext 
-      });
-      
-      const result = await activeModel.generateContent({
-        contents: [
-          ...history,
-          { role: 'user', parts: [{ text: prompt }] }
-        ]
-      });
-
-      const response = await result.response;
-      res.json({ text: response.text() });
-    } catch (error: any) {
-      console.error('Gemini API Error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post('/api/ai/stream', async (req, res) => {
-    const { history, prompt, systemContext, model } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) {
-      res.write(`data: ${JSON.stringify({ error: 'GEMINI_API_KEY_NOT_CONFIGURED' })}\n\n`);
-      return res.end();
-    }
-
-    res.setHeader('Content-Type', 'text/event-stream');
-    res.setHeader('Cache-Control', 'no-cache');
-    res.setHeader('Connection', 'keep-alive');
-
-    try {
-      const genAI = new GoogleGenAI(apiKey);
-      const activeModel = genAI.getGenerativeModel({ 
-        model: model || 'gemini-3-flash-preview',
-        systemInstruction: systemContext 
-      });
-      
-      const result = await activeModel.generateContentStream({
-        contents: [
-          ...history,
-          { role: 'user', parts: [{ text: prompt }] }
-        ]
-      });
-
-      for await (const chunk of result.stream) {
-        const text = chunk.text();
-        res.write(`data: ${JSON.stringify({ text })}\n\n`);
-      }
-    } catch (error: any) {
-      console.error('Gemini Stream Error:', error);
-      res.write(`data: ${JSON.stringify({ error: error.message })}\n\n`);
-    } finally {
-      res.end();
-    }
-  });
-
-  app.post('/api/ai/image', async (req, res) => {
-    const { prompt, options } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY_NOT_CONFIGURED' });
-
-    try {
-      const genAI = new GoogleGenAI(apiKey);
-      const activeModel = genAI.getGenerativeModel({ 
-        model: 'gemini-2.5-flash-image'
-      });
-      
-      const result = await activeModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text: prompt }] }]
-      });
-
-      const response = await result.response;
-      const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
-      if (part?.inlineData) {
-        res.json({ imageUrl: `data:image/png;base64,${part.inlineData.data}` });
-      } else {
-        res.status(500).json({ error: 'No image data returned' });
-      }
-    } catch (error: any) {
-      console.error('Image Gen Error:', error);
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  app.post('/api/ai/tts', async (req, res) => {
-    const { text, voice } = req.body;
-    const apiKey = process.env.GEMINI_API_KEY;
-
-    if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY_NOT_CONFIGURED' });
-
-    try {
-      const genAI = new GoogleGenAI(apiKey);
-      const activeModel = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-tts-preview' });
-      
-      const result = await activeModel.generateContent({
-        contents: [{ role: 'user', parts: [{ text }] }],
-        generationConfig: {
-          responseModalities: ["AUDIO" as any],
-          speechConfig: {
-            voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: voice || 'Kore' },
-            },
-          },
-        },
-      });
-
-      const response = await result.response;
-      const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
-      if (base64Audio) {
-        res.json({ audioUrl: `data:audio/wav;base64,${base64Audio}` });
-      } else {
-        res.status(500).json({ error: 'No audio data returned' });
-      }
-    } catch (error: any) {
-      console.error('TTS Error:', error);
-      res.status(500).json({ error: error.message });
-    }
+  // API Health Check
+  app.get('/api/health', (req, res) => {
+    res.json({ status: 'active', timestamp: new Date().toISOString() });
   });
 
   // Vite middleware for development
