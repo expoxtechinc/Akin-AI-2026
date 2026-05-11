@@ -1,0 +1,37 @@
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap');
+@import "tailwindcss";
+
+@theme {
+  --font-sans: "Inter", ui-sans-serif, system-ui, sans-serif;
+}
+
+@utility glass {
+  background: rgba(255, 255, 255, 0.03);
+  backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+@utility accent-glow {
+  text-shadow: 0 0 15px rgba(139, 92, 246, 0.5);
+}
+
+@utility monochrome-grid {
+  background-image: radial-gradient(rgba(255, 255, 255, 0.05) 1px, transparent 1px);
+  background-size: 32px 32px;
+}
+
+@utility pill-btn {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 9999px;
+  transition: all 0.3s ease;
+}
+
+@utility safe-bottom {
+  padding-bottom: env(safe-area-inset-bottom, 1rem);
+}
+
+@layer base {
+  body {
+    @apply antialiased text-[#E5E7EB] bg-[#050505];
+  }
+}
