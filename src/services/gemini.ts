@@ -1,25 +1,30 @@
-import { GoogleGenAI } from "@google/genai";
+import { GoogleGenAI, Type } from "@google/genai";
 
 const AI_MODEL = "gemini-3-flash-preview";
+const IMAGE_MODEL = "gemini-2.5-flash-image";
+
+export interface Task {
+  id: string;
+  title: string;
+  completed: boolean;
+  dueDate?: string;
+  priority: 'low' | 'medium' | 'high';
+}
 
 export class GeminiService {
   private ai: GoogleGenAI | null = null;
 
   private getClient() {
     if (this.ai) return this.ai;
-
-    // Support both standard Vite and polyfilled process.env
     const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    
     if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
        throw new Error("MISSING_API_KEY");
     }
-
     this.ai = new GoogleGenAI({ apiKey });
     return this.ai;
   }
 
-  async generateChatResponse(history: { role: "user" | "model"; parts: { text: string }[] }[], prompt: string) {
+  async generateChatResponse(history: { role: "user" | "model"; parts: { text: string }[] }[], prompt: string, systemContext?: string) {
     try {
       const client = this.getClient();
       const response = await client.models.generateContent({
@@ -29,7 +34,7 @@ export class GeminiService {
           { role: "user", parts: [{ text: prompt }] }
         ],
         config: {
-          systemInstruction: "You are AkinAI, a sophisticated and helpful personal AI assistant. Your tone is professional, intelligent, and proactive. Keep responses concise but impactful. Use markdown for formatting.",
+          systemInstruction: systemContext || "You are AkinAI, a sophisticated and helpful personal AI assistant created by Akin S. Sokpah from Liberia. Your tone is professional, intelligent, and proactive. Keep responses concise but impactful. Use markdown for formatting. If the user asks to generate an image, describe what you would generate first.",
         }
       });
 
@@ -41,7 +46,60 @@ export class GeminiService {
     }
   }
 
-  async generateTTS(text: string) {
+  async generateImage(prompt: string) {
+    try {
+      const client = this.getClient();
+      const response = await client.models.generateContent({
+        model: IMAGE_MODEL,
+        contents: [{ parts: [{ text: prompt }] }],
+        config: {
+          imageConfig: {
+            aspectRatio: "1:1",
+          }
+        }
+      });
+
+      for (const part of response.candidates?.[0]?.content?.parts || []) {
+        if (part.inlineData) {
+          return `data:image/png;base64,${part.inlineData.data}`;
+        }
+      }
+      return null;
+    } catch (error) {
+      console.error("Image Gen Error:", error);
+      return null;
+    }
+  }
+
+  async extractTasks(text: string): Promise<Partial<Task>[]> {
+    try {
+      const client = this.getClient();
+      const response = await client.models.generateContent({
+        model: AI_MODEL,
+        contents: [{ parts: [{ text: `Extract any potential tasks or to-do items from this text: "${text}". Return as a JSON array of objects with title and optional priority (low, medium, high).` }] }],
+        config: {
+          responseMimeType: "application/json",
+          responseSchema: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                priority: { type: Type.STRING, enum: ['low', 'medium', 'high'] }
+              },
+              required: ['title']
+            }
+          }
+        }
+      });
+      return JSON.parse(response.text || "[]");
+    } catch (error) {
+      console.error("Task Extraction Error:", error);
+      return [];
+    }
+  }
+
+  async generateTTS(text: string, voice: string = "Kore") {
     try {
       const client = this.getClient();
       const response = await client.models.generateContent({
@@ -51,7 +109,7 @@ export class GeminiService {
           responseModalities: ["AUDIO" as any],
           speechConfig: {
             voiceConfig: {
-              prebuiltVoiceConfig: { voiceName: "Kore" },
+              prebuiltVoiceConfig: { voiceName: voice as any },
             },
           },
         },
