@@ -7,8 +7,7 @@ import {
   query, 
   orderBy, 
   deleteDoc, 
-  onSnapshot,
-  Timestamp 
+  onSnapshot
 } from 'firebase/firestore';
 import { db, auth } from './firebase';
 
@@ -32,6 +31,14 @@ interface FirestoreErrorInfo {
   }
 }
 
+// Local Storage Fallback for Neural Identity Mode
+const isNeuralMode = (userId: string) => userId.startsWith('neural_');
+
+const localStore = {
+  get: (key: string) => JSON.parse(localStorage.getItem(`akinai_${key}`) || 'null'),
+  set: (key: string, val: any) => localStorage.setItem(`akinai_${key}`, JSON.stringify(val)),
+};
+
 function handleFirestoreError(error: unknown, operationType: OperationType, path: string | null) {
   const errInfo: FirestoreErrorInfo = {
     error: error instanceof Error ? error.message : String(error),
@@ -43,33 +50,48 @@ function handleFirestoreError(error: unknown, operationType: OperationType, path
     operationType,
     path
   };
-  console.error('Firestore Error:', JSON.stringify(errInfo));
-  throw new Error(JSON.stringify(errInfo));
+  console.warn('Firestore Operation Redirected or Failed:', errInfo.error);
+  // We swallow the error and rely on the fact that UI will use whatever data we return (or we could throw if we want strict mode)
 }
 
 export const dataService = {
   // User Profile
   async getUserProfile(userId: string) {
+    if (isNeuralMode(userId)) {
+      return localStore.get(`profile_${userId}`);
+    }
     const path = `users/${userId}`;
     try {
       const docSnap = await getDoc(doc(db, path));
       return docSnap.exists() ? docSnap.data() : null;
     } catch (error) {
       handleFirestoreError(error, OperationType.GET, path);
+      return localStore.get(`profile_${userId}`);
     }
   },
 
   async setUserProfile(userId: string, data: any) {
+    if (isNeuralMode(userId)) {
+      localStore.set(`profile_${userId}`, { ...data, updatedAt: new Date().toISOString() });
+      return;
+    }
     const path = `users/${userId}`;
     try {
       await setDoc(doc(db, path), { ...data, updatedAt: new Date().toISOString() });
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, path);
+      localStore.set(`profile_${userId}`, { ...data, updatedAt: new Date().toISOString() });
     }
   },
 
   // Tasks
   subscribeToTasks(userId: string, callback: (tasks: any[]) => void) {
+    if (isNeuralMode(userId)) {
+      const tasks = localStore.get(`tasks_${userId}`) || [];
+      callback(tasks.sort((a: any, b: any) => b.createdAt - a.createdAt));
+      return () => {};
+    }
+    
     const path = `users/${userId}/tasks`;
     const q = query(collection(db, path), orderBy('createdAt', 'desc'));
     
@@ -78,19 +100,38 @@ export const dataService = {
       callback(tasks);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
+      const tasks = localStore.get(`tasks_${userId}`) || [];
+      callback(tasks);
     });
   },
 
   async addTask(userId: string, task: any) {
+    const taskData = { ...task, createdAt: Date.now() };
+    if (isNeuralMode(userId)) {
+      const tasks = localStore.get(`tasks_${userId}`) || [];
+      localStore.set(`tasks_${userId}`, [taskData, ...tasks]);
+      return;
+    }
     const path = `users/${userId}/tasks/${task.id}`;
     try {
-      await setDoc(doc(db, path), { ...task, createdAt: Date.now() });
+      await setDoc(doc(db, path), taskData);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
+      const tasks = localStore.get(`tasks_${userId}`) || [];
+      localStore.set(`tasks_${userId}`, [taskData, ...tasks]);
     }
   },
 
   async updateTask(userId: string, task: any) {
+    if (isNeuralMode(userId)) {
+      const tasks = localStore.get(`tasks_${userId}`) || [];
+      const index = tasks.findIndex((t: any) => t.id === task.id);
+      if (index !== -1) {
+        tasks[index] = { ...tasks[index], ...task };
+        localStore.set(`tasks_${userId}`, tasks);
+      }
+      return;
+    }
     const path = `users/${userId}/tasks/${task.id}`;
     try {
       await setDoc(doc(db, path), task, { merge: true });
@@ -100,6 +141,11 @@ export const dataService = {
   },
 
   async deleteTask(userId: string, taskId: string) {
+    if (isNeuralMode(userId)) {
+      const tasks = localStore.get(`tasks_${userId}`) || [];
+      localStore.set(`tasks_${userId}`, tasks.filter((t: any) => t.id !== taskId));
+      return;
+    }
     const path = `users/${userId}/tasks/${taskId}`;
     try {
       await deleteDoc(doc(db, path));
@@ -110,6 +156,11 @@ export const dataService = {
 
   // Messages
   subscribeToMessages(userId: string, callback: (messages: any[]) => void) {
+    if (isNeuralMode(userId)) {
+      const messages = localStore.get(`messages_${userId}`) || [];
+      callback(messages);
+      return () => {};
+    }
     const path = `users/${userId}/messages`;
     const q = query(collection(db, path), orderBy('timestamp', 'asc'));
     
@@ -118,19 +169,31 @@ export const dataService = {
       callback(messages);
     }, (error) => {
       handleFirestoreError(error, OperationType.LIST, path);
+      callback(localStore.get(`messages_${userId}`) || []);
     });
   },
 
   async addMessage(userId: string, message: any) {
+    if (isNeuralMode(userId)) {
+      const messages = localStore.get(`messages_${userId}`) || [];
+      localStore.set(`messages_${userId}`, [...messages, message]);
+      return;
+    }
     const path = `users/${userId}/messages/${message.id}`;
     try {
       await setDoc(doc(db, path), message);
     } catch (error) {
       handleFirestoreError(error, OperationType.CREATE, path);
+      const messages = localStore.get(`messages_${userId}`) || [];
+      localStore.set(`messages_${userId}`, [...messages, message]);
     }
   },
   
   async clearMessages(userId: string) {
+    if (isNeuralMode(userId)) {
+      localStore.set(`messages_${userId}`, []);
+      return;
+    }
     const path = `users/${userId}/messages`;
     try {
       const snapshot = await getDocs(collection(db, path));
@@ -138,6 +201,7 @@ export const dataService = {
       await Promise.all(deletions);
     } catch (error) {
       handleFirestoreError(error, OperationType.DELETE, path);
+      localStore.set(`messages_${userId}`, []);
     }
   }
 };

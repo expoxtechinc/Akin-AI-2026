@@ -21,11 +21,11 @@ function AppContent() {
 
   if (loading) {
     return (
-      <div className="h-screen bg-[#050505] flex items-center justify-center">
+      <div className="h-screen bg-[#020202] flex items-center justify-center">
         <motion.div 
           animate={{ scale: [1, 1.2, 1], rotate: [0, 180, 360] }}
           transition={{ repeat: Infinity, duration: 2 }}
-          className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full"
+          className="w-12 h-12 border-2 border-violet-500 border-t-transparent rounded-full shadow-[0_0_20px_rgba(124,58,237,0.3)]"
         />
       </div>
     );
@@ -48,7 +48,7 @@ function AppContent() {
   };
 
   return (
-    <div className="flex h-screen bg-[#050505] text-[#E5E7EB] font-sans selection:bg-violet-500/30 selection:text-white overflow-hidden">
+    <div className="flex h-screen bg-[#020202] text-[#E5E7EB] font-sans selection:bg-violet-500/30 selection:text-white overflow-hidden">
       <Sidebar 
         activeView={activeView} 
         setActiveView={setActiveView} 

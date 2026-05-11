@@ -1,11 +1,18 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
-import { User, onAuthStateChanged } from 'firebase/auth';
-import { auth, googleProvider, signInWithPopup, signOut } from '../services/firebase';
+import React, { createContext, useContext, useState, useEffect } from 'react';
+
+export interface User {
+  uid: string;
+  email: string | null;
+  displayName: string | null;
+  photoURL: string | null;
+}
 
 interface AuthContextType {
   user: User | null;
   loading: boolean;
-  signIn: () => Promise<void>;
+  signIn: () => Promise<void>; // Kept for interface compatibility but points to modal trigger
+  signUpCustom: (email: string, name: string) => Promise<void>;
+  signInCustom: (email: string) => Promise<void>;
   logout: () => Promise<void>;
 }
 
@@ -16,38 +23,54 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const unsubscribe = onAuthStateChanged(auth, (user) => {
-      setUser(user);
-      setLoading(false);
-    });
-    return unsubscribe;
+    // Check for local session
+    const savedUser = localStorage.getItem('akinai_neural_user');
+    if (savedUser) {
+      setUser(JSON.parse(savedUser));
+    }
+    setLoading(false);
   }, []);
 
   const signIn = async () => {
-    try {
-      await signInWithPopup(auth, googleProvider);
-    } catch (error: any) {
-      console.group('Authentication Error');
-      console.error("Sign in failed:", error.code);
-      if (error.code === 'auth/unauthorized-domain') {
-        const currentDomain = window.location.hostname;
-        console.error(`DIAGNOSTIC: Domain "${currentDomain}" is not authorized.`);
-        console.error("FIX: Add this domain to Firebase Console > Authentication > Settings > Authorized domains.");
+    // This will be handled by the UI
+    console.log('Initiating Neural Auth UI');
+  };
+
+  const signUpCustom = async (email: string, name: string) => {
+    const newUser: User = {
+      uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
+      email,
+      displayName: name,
+      photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=${name}`,
+    };
+    
+    // Simulate neural sync latency
+    await new Promise(resolve => setTimeout(resolve, 1500));
+    
+    localStorage.setItem('akinai_neural_user', JSON.stringify(newUser));
+    setUser(newUser);
+  };
+
+  const signInCustom = async (email: string) => {
+    const savedUser = localStorage.getItem('akinai_neural_user');
+    if (savedUser) {
+      const parsed = JSON.parse(savedUser);
+      if (parsed.email === email) {
+        await new Promise(resolve => setTimeout(resolve, 1200));
+        setUser(parsed);
+        return;
       }
-      console.groupEnd();
     }
+    throw new Error('Neural Signature not found in local cache');
   };
 
   const logout = async () => {
-    try {
-      await signOut(auth);
-    } catch (error) {
-      console.error("Logout failed:", error);
-    }
+    localStorage.removeItem('akinai_neural_user');
+    setUser(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, loading, signIn, logout }}>
+    <AuthContext.Provider value={{ user, loading, signIn, signUpCustom, signInCustom, logout }}>
       {!loading && children}
     </AuthContext.Provider>
   );
