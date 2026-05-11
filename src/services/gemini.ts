@@ -16,8 +16,8 @@ export class GeminiService {
 
   private getClient() {
     if (this.ai) return this.ai;
-    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
-    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
        throw new Error("MISSING_API_KEY");
     }
     this.ai = new GoogleGenAI({ apiKey });
@@ -46,7 +46,33 @@ export class GeminiService {
     }
   }
 
-  async generateImage(prompt: string) {
+  async *generateChatResponseStream(history: { role: string; parts: { text: string }[] }[], prompt: string, systemContext?: string) {
+    try {
+      const client = this.getClient();
+      const response = await client.models.generateContentStream({
+        model: AI_MODEL,
+        contents: [
+          ...history,
+          { role: "user", parts: [{ text: prompt }] }
+        ],
+        config: {
+          systemInstruction: systemContext || "You are AkinAI, a sophisticated personal AI assistant created by Akin S. Sokpah from Liberia.",
+        }
+      });
+      
+      for await (const chunk of response) {
+        const chunkText = chunk.text;
+        if (chunkText) {
+          yield chunkText;
+        }
+      }
+    } catch (error) {
+      console.error("Gemini Stream Error:", error);
+      yield "Error: Neural connection interrupted.";
+    }
+  }
+
+  async generateImage(prompt: string, options: { aspectRatio?: string; quality?: string } = {}) {
     try {
       const client = this.getClient();
       const response = await client.models.generateContent({
@@ -54,8 +80,12 @@ export class GeminiService {
         contents: [{ parts: [{ text: prompt }] }],
         config: {
           imageConfig: {
-            aspectRatio: "1:1",
-          }
+            aspectRatio: options.aspectRatio === "16:9" ? "16:9" : 
+                         options.aspectRatio === "9:16" ? "9:16" : 
+                         options.aspectRatio === "4:3" ? "4:3" : 
+                         options.aspectRatio === "3:4" ? "3:4" : "1:1",
+            quality: options.quality === "high" ? "high" : "standard"
+          } as any
         }
       });
 

@@ -12,7 +12,9 @@ export default function ProfileView() {
     aiName: 'AkinAI',
     voice: 'Kore',
     style: 'Professional',
-    location: 'Liberia'
+    location: 'Liberia',
+    aspectRatio: '1:1',
+    quality: 'standard'
   });
   const [isSaving, setIsSaving] = useState(false);
 
@@ -28,7 +30,9 @@ export default function ProfileView() {
           aiName: 'AkinAI',
           voice: 'Kore',
           style: 'Professional',
-          location: 'Liberia'
+          location: 'Liberia',
+          aspectRatio: '1:1',
+          quality: 'standard'
         };
         setProfile(initial);
         await dataService.setUserProfile(user.uid, initial);
@@ -48,8 +52,10 @@ export default function ProfileView() {
     }
   };
 
-  const voices = ['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr'];
+  const voices = ['Aeon', 'Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr', 'Orion', 'Lyra'];
   const styles = ['Professional', 'Creative', 'Minimalist', 'Detailed'];
+  const aspectRatios = ['1:1', '16:9', '9:16', '4:3', '3:4'];
+  const qualities = ['standard', 'high'];
 
   return (
     <div className="flex-1 flex flex-col h-full bg-[#050505] p-6 lg:p-10 relative overflow-hidden monochrome-grid">
@@ -148,13 +154,36 @@ export default function ProfileView() {
                   </select>
                 </div>
                 <div className="space-y-2">
-                  <label className="text-[10px] uppercase font-black tracking-[0.2em] text-white/30 ml-2">Style</label>
+                  <label className="text-[10px] uppercase font-black tracking-[0.2em] text-white/30 ml-2">Style Preference</label>
                   <select 
                     value={profile.style}
                     onChange={(e) => saveProfile({ ...profile, style: e.target.value })}
                     className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-4 text-xs text-white focus:border-violet-500/50 outline-none transition-all font-bold appearance-none cursor-pointer"
                   >
                     {styles.map(s => <option key={s} value={s} className="bg-[#111]">{s}</option>)}
+                  </select>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-[0.2em] text-white/30 ml-2">Image Aspect Ratio</label>
+                  <select 
+                    value={profile.aspectRatio}
+                    onChange={(e) => saveProfile({ ...profile, aspectRatio: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-4 text-xs text-white focus:border-violet-500/50 outline-none transition-all font-bold appearance-none cursor-pointer"
+                  >
+                    {aspectRatios.map(r => <option key={r} value={r} className="bg-[#111]">{r}</option>)}
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] uppercase font-black tracking-[0.2em] text-white/30 ml-2">Generation Quality</label>
+                  <select 
+                    value={profile.quality}
+                    onChange={(e) => saveProfile({ ...profile, quality: e.target.value })}
+                    className="w-full bg-white/[0.03] border border-white/10 rounded-2xl py-4 px-4 text-xs text-white focus:border-violet-500/50 outline-none transition-all font-bold appearance-none cursor-pointer"
+                  >
+                    {qualities.map(q => <option key={q} value={q} className="bg-[#111]">{q}</option>)}
                   </select>
                 </div>
               </div>

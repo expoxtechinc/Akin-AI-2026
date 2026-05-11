@@ -1,16 +1,19 @@
 import React, { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Plus, Trash2, CheckCircle2, Circle, AlertCircle, Calendar, Sparkles } from 'lucide-react';
+import { Plus, Trash2, CheckCircle2, Circle, AlertCircle, Calendar, Sparkles, SortAsc, AlertTriangle, ArrowUpCircle, MinusCircle } from 'lucide-react';
 import { gemini, Task } from '../services/gemini';
 import { dataService } from '../services/dataService';
 import { useAuth } from '../contexts/AuthContext';
 import { cn } from '../lib/utils';
+
+type SortType = 'newest' | 'oldest' | 'priority-high' | 'priority-low';
 
 export default function TasksView() {
   const { user } = useAuth();
   const [tasks, setTasks] = useState<Task[]>([]);
   const [newTaskTitle, setNewTaskTitle] = useState('');
   const [isExtracting, setIsExtracting] = useState(false);
+  const [sortBy, setSortBy] = useState<SortType>('priority-high');
 
   useEffect(() => {
     if (!user) return;
@@ -64,15 +67,50 @@ export default function TasksView() {
     }
   };
 
+  const sortedTasks = [...tasks].sort((a, b) => {
+    if (sortBy === 'newest') return Number(b.id) - Number(a.id);
+    if (sortBy === 'oldest') return Number(a.id) - Number(b.id);
+    
+    const priorityMap = { high: 3, medium: 2, low: 1 };
+    if (sortBy === 'priority-high') return priorityMap[b.priority] - priorityMap[a.priority];
+    if (sortBy === 'priority-low') return priorityMap[a.priority] - priorityMap[b.priority];
+    
+    return 0;
+  });
+
+  const getPriorityIcon = (priority: Task['priority']) => {
+    switch (priority) {
+      case 'high': return <ArrowUpCircle size={10} />;
+      case 'medium': return <AlertTriangle size={10} />;
+      case 'low': return <MinusCircle size={10} />;
+    }
+  };
+
   return (
     <div className="flex-1 flex flex-col h-full bg-[#050505] p-6 lg:p-10 relative overflow-hidden monochrome-grid">
       <div className="max-w-3xl mx-auto w-full z-10">
-        <header className="mb-10 space-y-2">
-          <h1 className="text-4xl font-bold tracking-tighter text-white uppercase accent-glow">Task Engine</h1>
-          <p className="text-white/40 text-sm font-light uppercase tracking-widest">Neural Priority Management</p>
-        </header>
-
         {/* Input */}
+        <div className="flex items-center justify-between gap-4 mb-6">
+          <header className="space-y-1">
+            <h1 className="text-3xl font-black tracking-tighter text-white uppercase italic accent-glow">Task Engine</h1>
+            <p className="text-white/30 text-[10px] uppercase tracking-[0.4em] font-black">Neural Priority Management</p>
+          </header>
+          
+          <div className="flex items-center gap-2">
+            <label className="text-[9px] uppercase font-black tracking-widest text-white/20 whitespace-nowrap">Sort By</label>
+            <select 
+              value={sortBy}
+              onChange={(e) => setSortBy(e.target.value as SortType)}
+              className="bg-white/5 border border-white/10 rounded-xl px-3 py-1.5 text-[10px] font-bold text-white/60 outline-none focus:border-violet-500/50 transition-all uppercase tracking-widest appearance-none cursor-pointer"
+            >
+              <option value="priority-high">Heavy Priority</option>
+              <option value="priority-low">Light Priority</option>
+              <option value="newest">Recent Nodes</option>
+              <option value="oldest">Legacy Records</option>
+            </select>
+          </div>
+        </div>
+
         <form onSubmit={handleManualAdd} className="relative mb-10 group">
           <div className="glass p-2 rounded-2xl flex items-center gap-2 border-white/10 focus-within:border-violet-500/50 transition-all duration-300">
             <input
@@ -113,7 +151,7 @@ export default function TasksView() {
           </div>
 
           <AnimatePresence mode="popLayout">
-            {tasks.map((task) => (
+            {sortedTasks.map((task) => (
               <motion.div
                 key={task.id}
                 layout
@@ -122,7 +160,12 @@ export default function TasksView() {
                 exit={{ opacity: 0, x: 20 }}
                 className={cn(
                   "p-4 rounded-2xl glass transition-all flex items-center gap-4 group",
-                  task.completed ? "opacity-40 grayscale" : "border-white/5 bg-white/[0.02]"
+                  task.completed ? "opacity-40 grayscale" : "border-white/5 bg-white/[0.02]",
+                  !task.completed && (
+                    task.priority === 'high' ? "hover:border-red-500/30" :
+                    task.priority === 'medium' ? "hover:border-amber-500/30" :
+                    "hover:border-blue-500/30"
+                  )
                 )}
               >
                 <button 
@@ -137,30 +180,31 @@ export default function TasksView() {
 
                 <div className="flex-1 min-w-0">
                   <h3 className={cn(
-                    "text-sm font-medium tracking-tight",
+                    "text-sm font-bold tracking-tight",
                     task.completed ? "line-through" : "text-white"
                   )}>
                     {task.title}
                   </h3>
-                  <div className="flex items-center gap-3 mt-1">
+                  <div className="flex items-center gap-3 mt-1.5">
                     <span className={cn(
-                      "text-[9px] uppercase font-black tracking-widest px-1.5 py-0.5 rounded",
-                      task.priority === 'high' ? "bg-red-500/10 text-red-400" :
-                      task.priority === 'medium' ? "bg-amber-500/10 text-amber-400" :
-                      "bg-blue-500/10 text-blue-400"
+                      "text-[9px] uppercase font-black tracking-widest px-2 py-0.5 rounded-full flex items-center gap-1.5 border transition-all",
+                      task.priority === 'high' ? "bg-red-500/10 text-red-400 border-red-500/20" :
+                      task.priority === 'medium' ? "bg-amber-500/10 text-amber-400 border-amber-500/20" :
+                      "bg-blue-500/10 text-blue-400 border-blue-500/20"
                     )}>
+                      {getPriorityIcon(task.priority)}
                       {task.priority}
                     </span>
-                    <div className="flex items-center gap-1 text-[9px] text-white/30 uppercase font-bold">
-                      <Calendar size={10} />
-                      <span>{new Date().toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
+                    <div className="flex items-center gap-1.5 text-[9px] text-white/30 uppercase font-bold">
+                      <Calendar size={10} className="opacity-50" />
+                      <span>{new Date(Number(task.id)).toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
                     </div>
                   </div>
                 </div>
 
                 <button 
                   onClick={() => deleteTask(task.id)}
-                  className="opacity-0 group-hover:opacity-100 p-2 text-white/20 hover:text-red-400 transition-all"
+                  className="opacity-0 group-hover:opacity-100 p-2 text-white/20 hover:text-red-400 transition-all active:scale-90"
                 >
                   <Trash2 size={16} />
                 </button>
