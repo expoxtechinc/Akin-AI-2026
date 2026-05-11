@@ -2,7 +2,7 @@ import express from 'express';
 import { createServer as createViteServer } from 'vite';
 import path from 'path';
 import cors from 'cors';
-import { GoogleGenAI, Modality } from '@google/genai';
+import { GoogleGenAI } from '@google/genai';
 
 async function startServer() {
   const app = express();
@@ -21,20 +21,21 @@ async function startServer() {
     }
 
     try {
-      const genAI = new GoogleGenAI({ apiKey });
-      
-      const response = await genAI.models.generateContent({
+      const genAI = new GoogleGenAI(apiKey);
+      const activeModel = genAI.getGenerativeModel({ 
         model: model || 'gemini-3-flash-preview',
+        systemInstruction: systemContext 
+      });
+      
+      const result = await activeModel.generateContent({
         contents: [
           ...history,
           { role: 'user', parts: [{ text: prompt }] }
-        ],
-        config: {
-          systemInstruction: systemContext
-        }
+        ]
       });
 
-      res.json({ text: response.text });
+      const response = await result.response;
+      res.json({ text: response.text() });
     } catch (error: any) {
       console.error('Gemini API Error:', error);
       res.status(500).json({ error: error.message });
@@ -55,21 +56,21 @@ async function startServer() {
     res.setHeader('Connection', 'keep-alive');
 
     try {
-      const genAI = new GoogleGenAI({ apiKey });
-      
-      const response = await genAI.models.generateContentStream({
+      const genAI = new GoogleGenAI(apiKey);
+      const activeModel = genAI.getGenerativeModel({ 
         model: model || 'gemini-3-flash-preview',
+        systemInstruction: systemContext 
+      });
+      
+      const result = await activeModel.generateContentStream({
         contents: [
           ...history,
           { role: 'user', parts: [{ text: prompt }] }
-        ],
-        config: {
-          systemInstruction: systemContext
-        }
+        ]
       });
 
-      for await (const chunk of response) {
-        const text = chunk.text;
+      for await (const chunk of result.stream) {
+        const text = chunk.text();
         res.write(`data: ${JSON.stringify({ text })}\n\n`);
       }
     } catch (error: any) {
@@ -87,19 +88,16 @@ async function startServer() {
     if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY_NOT_CONFIGURED' });
 
     try {
-      const genAI = new GoogleGenAI({ apiKey });
+      const genAI = new GoogleGenAI(apiKey);
+      const activeModel = genAI.getGenerativeModel({ 
+        model: 'gemini-2.5-flash-image'
+      });
       
-      const response = await genAI.models.generateContent({
-        model: 'gemini-2.5-flash-image',
-        contents: [{ role: 'user', parts: [{ text: prompt }] }],
-        config: {
-          imageConfig: {
-            aspectRatio: options?.aspectRatio || '1:1',
-            quality: options?.quality || 'standard'
-          } as any
-        }
+      const result = await activeModel.generateContent({
+        contents: [{ role: 'user', parts: [{ text: prompt }] }]
       });
 
+      const response = await result.response;
       const part = response.candidates?.[0]?.content?.parts?.find(p => p.inlineData);
       if (part?.inlineData) {
         res.json({ imageUrl: `data:image/png;base64,${part.inlineData.data}` });
@@ -119,13 +117,13 @@ async function startServer() {
     if (!apiKey) return res.status(500).json({ error: 'GEMINI_API_KEY_NOT_CONFIGURED' });
 
     try {
-      const genAI = new GoogleGenAI({ apiKey });
+      const genAI = new GoogleGenAI(apiKey);
+      const activeModel = genAI.getGenerativeModel({ model: 'gemini-3.1-flash-tts-preview' });
       
-      const response = await genAI.models.generateContent({
-        model: 'gemini-3.1-flash-tts-preview',
+      const result = await activeModel.generateContent({
         contents: [{ role: 'user', parts: [{ text }] }],
-        config: {
-          responseModalities: [Modality.AUDIO],
+        generationConfig: {
+          responseModalities: ["AUDIO" as any],
           speechConfig: {
             voiceConfig: {
               prebuiltVoiceConfig: { voiceName: voice || 'Kore' },
@@ -134,6 +132,7 @@ async function startServer() {
         },
       });
 
+      const response = await result.response;
       const base64Audio = response.candidates?.[0]?.content?.parts?.[0]?.inlineData?.data;
       if (base64Audio) {
         res.json({ audioUrl: `data:audio/wav;base64,${base64Audio}` });
