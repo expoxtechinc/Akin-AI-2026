@@ -8,7 +8,6 @@ import Chat from './components/Chat';
 import Sidebar from './components/Sidebar';
 import TasksView from './components/TasksView';
 import ProfileView from './components/ProfileView';
-import Login from './components/Login';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import { AnimatePresence, motion } from 'motion/react';
 
@@ -29,10 +28,6 @@ function AppContent() {
         />
       </div>
     );
-  }
-
-  if (!user) {
-    return <Login />;
   }
 
   const renderView = () => {

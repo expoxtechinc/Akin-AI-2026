@@ -24,10 +24,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   useEffect(() => {
     // Check for local session
-    const savedUser = localStorage.getItem('akinai_neural_user');
-    if (savedUser) {
-      setUser(JSON.parse(savedUser));
+    let savedUser = localStorage.getItem('akinai_neural_user');
+    
+    if (!savedUser) {
+      // Auto-provision user on first visit to bypass friction
+      const defaultUser: User = {
+        uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
+        email: 'guest@neural.akin',
+        displayName: 'Neural Operator',
+        photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=AkinAI`,
+      };
+      localStorage.setItem('akinai_neural_user', JSON.stringify(defaultUser));
+      savedUser = JSON.stringify(defaultUser);
     }
+    
+    setUser(JSON.parse(savedUser));
     setLoading(false);
   }, []);
 
@@ -66,7 +77,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
   const logout = async () => {
     localStorage.removeItem('akinai_neural_user');
-    setUser(null);
+    const defaultUser: User = {
+      uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
+      email: 'guest@neural.akin',
+      displayName: 'Neural Operator',
+      photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=AkinAI`,
+    };
+    localStorage.setItem('akinai_neural_user', JSON.stringify(defaultUser));
+    setUser(defaultUser);
   };
 
   return (
