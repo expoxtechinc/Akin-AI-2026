@@ -23,23 +23,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    // Check for local session
-    let savedUser = localStorage.getItem('akinai_neural_user');
-    
-    if (!savedUser) {
-      // Auto-provision user on first visit to bypass friction
-      const defaultUser: User = {
-        uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
-        email: 'guest@neural.akin',
-        displayName: 'Neural Operator',
-        photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=AkinAI`,
-      };
-      localStorage.setItem('akinai_neural_user', JSON.stringify(defaultUser));
-      savedUser = JSON.stringify(defaultUser);
+    try {
+      // Check for local session
+      let savedUser = localStorage.getItem('akinai_neural_user');
+      
+      if (!savedUser) {
+        // Auto-provision user on first visit to bypass friction
+        const defaultUser: User = {
+          uid: `neural_${Math.random().toString(36).substr(2, 9)}`,
+          email: 'guest@neural.akin',
+          displayName: 'Neural Operator',
+          photoURL: `https://api.dicebear.com/7.x/avataaars/svg?seed=AkinAI`,
+        };
+        localStorage.setItem('akinai_neural_user', JSON.stringify(defaultUser));
+        savedUser = JSON.stringify(defaultUser);
+      }
+      
+      try {
+        const parsed = JSON.parse(savedUser);
+        if (parsed && typeof parsed === 'object') {
+          setUser(parsed);
+        } else {
+          throw new Error('Invalid user format');
+        }
+      } catch (e) {
+        // Recovery: clear corrupted storage
+        localStorage.removeItem('akinai_neural_user');
+        window.location.reload();
+      }
+    } catch (criticalError) {
+      console.error('Critical Auth Error:', criticalError);
+    } finally {
+      setLoading(false);
     }
-    
-    setUser(JSON.parse(savedUser));
-    setLoading(false);
   }, []);
 
   const signIn = async () => {
