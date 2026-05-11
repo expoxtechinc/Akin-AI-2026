@@ -114,8 +114,8 @@ export default function Chat({ onMenuClick }: ChatProps) {
         parts: [{ text: m.content }]
       }));
 
-      const profile = JSON.parse(localStorage.getItem('akin_profile') || '{}');
-      const systemContext = `You are ${profile.aiName || 'AkinAI'}, a sophisticated personal AI assistant created by Akin S. Sokpah from Liberia. Your tone is ${profile.style || 'Professional'}. Use markdown for formatting.`;
+      const modelProfile = await dataService.getUserProfile(user.uid);
+      const systemContext = `You are ${modelProfile?.aiName || 'AkinAI'}, a sophisticated personal AI assistant created by Akin S. Sokpah from Liberia. Your tone is ${modelProfile?.style || 'Professional'}. Use markdown for formatting.`;
 
       const res = await gemini.generateChatResponse(history, textToProcess, systemContext);
       
@@ -144,11 +144,11 @@ export default function Chat({ onMenuClick }: ChatProps) {
   };
 
   const speakMessage = async (text: string) => {
-    if (isSpeaking) return;
+    if (isSpeaking || !user) return;
     setIsSpeaking(true);
     try {
-      const profile = JSON.parse(localStorage.getItem('akin_profile') || '{}');
-      const audioUrl = await gemini.generateTTS(text, profile.voice || 'Kore');
+      const modelProfile = await dataService.getUserProfile(user.uid);
+      const audioUrl = await gemini.generateTTS(text, modelProfile?.voice || 'Kore');
       if (audioUrl) {
         const audio = new Audio(audioUrl);
         audio.onended = () => setIsSpeaking(false);
