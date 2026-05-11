@@ -58,8 +58,18 @@ export default function Chat() {
       };
 
       setMessages(prev => [...prev, modelMessage]);
-    } catch (error) {
+    } catch (error: any) {
       console.error(error);
+      const errorMessage = error.message === "MISSING_API_KEY" 
+        ? "⚠️ Gemini API Key not found. Please add VITE_GEMINI_API_KEY to your environment variables."
+        : "⚠️ Connection error. Please check your network.";
+      
+      setMessages(prev => [...prev, {
+        id: Date.now().toString(),
+        role: 'model',
+        content: errorMessage,
+        timestamp: Date.now()
+      }]);
     } finally {
       setIsLoading(false);
     }

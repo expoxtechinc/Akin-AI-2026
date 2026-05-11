@@ -3,19 +3,26 @@ import { GoogleGenAI } from "@google/genai";
 const AI_MODEL = "gemini-3-flash-preview";
 
 export class GeminiService {
-  private ai: GoogleGenAI;
+  private ai: GoogleGenAI | null = null;
 
-  constructor() {
-    const apiKey = process.env.GEMINI_API_KEY;
-    if (!apiKey) {
-      throw new Error("GEMINI_API_KEY is not defined in environment variables.");
+  private getClient() {
+    if (this.ai) return this.ai;
+
+    // Support both standard Vite and polyfilled process.env
+    const apiKey = import.meta.env.VITE_GEMINI_API_KEY || process.env.GEMINI_API_KEY;
+    
+    if (!apiKey || apiKey === "MY_GEMINI_API_KEY") {
+       throw new Error("MISSING_API_KEY");
     }
+
     this.ai = new GoogleGenAI({ apiKey });
+    return this.ai;
   }
 
   async generateChatResponse(history: { role: "user" | "model"; parts: { text: string }[] }[], prompt: string) {
     try {
-      const response = await this.ai.models.generateContent({
+      const client = this.getClient();
+      const response = await client.models.generateContent({
         model: AI_MODEL,
         contents: [
           ...history,
@@ -27,7 +34,8 @@ export class GeminiService {
       });
 
       return response.text;
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message === "MISSING_API_KEY") throw error;
       console.error("Gemini API Error:", error);
       throw error;
     }
@@ -35,7 +43,8 @@ export class GeminiService {
 
   async generateTTS(text: string) {
     try {
-      const response = await this.ai.models.generateContent({
+      const client = this.getClient();
+      const response = await client.models.generateContent({
         model: "gemini-3.1-flash-tts-preview",
         contents: [{ parts: [{ text }] }],
         config: {
